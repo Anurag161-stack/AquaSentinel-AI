@@ -1,0 +1,18 @@
+AquaSentinel AI — Connected Frontend + Backend
+
+1) Open PowerShell in aquasentinel-backend
+2) Create environment:
+   py -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+3) Set demo environment:
+   $env:AQUA_API_KEY="dev-key-change-me"
+   $env:AQUA_WEATHER="mock"
+4) Start backend:
+   .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+5) Open this in Chrome:
+   http://127.0.0.1:8000/app
+
+Swagger/API docs:
+   http://127.0.0.1:8000/docs
+
+The frontend is served BY the backend, so you do not need a second frontend server or CORS setup for the demo.

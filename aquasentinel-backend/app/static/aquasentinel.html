@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AquaSentinel AI: live field prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E7EFEB; --bg2:#D8E5DE; --ink:#14302E; --ink2:#41595A; --line:#B3C8C0;
+  --leaf:#4E8B37; --wait:#1F6E8C; --reduce:#8F5C05; --irrigate:#B23D1F;
+  --deep:#12403F; --deepInk:#E4EFEA; --deepInk2:#A9C6BE; --btn:#14302E; --btnInk:#E7EFEB;
+  --track:#C9DAD3;
+  --font-d:'Bricolage Grotesque','Trebuchet MS',system-ui,sans-serif;
+  --font-t:'Newsreader',Georgia,'Times New Roman',serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E2123; --bg2:#14302F; --ink:#E2EEE9; --ink2:#A3BDB6; --line:#2C4A47;
+    --leaf:#7DBB5E; --wait:#5DB8D6; --reduce:#E0A63A; --irrigate:#F07B58;
+    --deep:#071615; --deepInk:#E2EEE9; --deepInk2:#8FB0A7; --btn:#E2EEE9; --btnInk:#0E2123; --track:#22403E;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E2123; --bg2:#14302F; --ink:#E2EEE9; --ink2:#A3BDB6; --line:#2C4A47;
+  --leaf:#7DBB5E; --wait:#5DB8D6; --reduce:#E0A63A; --irrigate:#F07B58;
+  --deep:#071615; --deepInk:#E2EEE9; --deepInk2:#8FB0A7; --btn:#E2EEE9; --btnInk:#0E2123; --track:#22403E;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:auto;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 70px);scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-d);font-size:17px;line-height:1.5;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--wait);outline-offset:3px;border-radius:4px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.02em;line-height:1.05}
+h2{font-size:clamp(1.55rem,3.2vw,2.3rem);font-variation-settings:'opsz' 60}
+p{margin:0}
+.serif{font-family:var(--font-t);font-size:1.12rem;line-height:1.55;color:var(--ink2)}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.15rem;letter-spacing:-.02em}
+.brand svg{width:30px;height:30px}
+.clock{margin-left:auto;font-weight:600;font-size:.98rem;color:var(--ink2);min-width:9.5ch}
+.backend-status{font-size:.82rem;font-weight:700;color:var(--ink2);white-space:nowrap}.backend-status[data-ok="1"]{color:var(--leaf)}.backend-status[data-ok="0"]{color:var(--irrigate)}
+.ctrl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn{border:0;background:var(--btn);color:var(--btnInk);padding:.5em 1em;border-radius:999px;font-weight:600;font-size:.92rem;cursor:pointer;transition:transform .15s ease,opacity .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(1px) scale(.98)}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn[disabled]{opacity:.4;cursor:not-allowed;transform:none}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:.42em .85em;font-weight:600;font-size:.9rem;cursor:pointer;transition:background .2s,color .2s}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:.92rem;font-weight:600;cursor:pointer}
+.switch input{appearance:none;width:42px;height:24px;border-radius:99px;background:var(--track);position:relative;cursor:pointer;transition:background .25s;margin:0;flex:none}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .25s cubic-bezier(.3,1.4,.5,1)}
+.switch input:checked{background:var(--leaf)}
+.switch input:checked::after{transform:translateX(18px)}
+
+/* hero */
+.hero{padding:clamp(28px,6vw,64px) 0 26px}
+.hero h1{font-size:clamp(2.3rem,6.4vw,5rem);font-variation-settings:'opsz' 96;line-height:.98;letter-spacing:-.035em}
+.hero h1 span{display:block;animation:lineIn .9s cubic-bezier(.2,.8,.2,1) both}
+.hero h1 span:nth-child(2){animation-delay:.16s}
+.hero h1 span:nth-child(3){animation-delay:.32s}
+@keyframes lineIn{from{opacity:0;transform:translateY(38px) rotate(1.2deg)}to{opacity:1;transform:none}}
+.hero .serif{max-width:52ch;margin-top:18px;animation:lineIn .9s .5s cubic-bezier(.2,.8,.2,1) both}
+
+/* scene */
+.sceneBox{border-radius:26px;overflow-x:auto;overflow-y:hidden;background:#3b2a1e;box-shadow:0 30px 60px -30px rgba(10,30,28,.55)}
+.sceneBox svg{display:block;width:100%;min-width:760px;height:auto}
+.sceneNote{margin-top:16px;font-family:var(--font-t);font-size:1.18rem;line-height:1.6;color:var(--ink2);max-width:80ch}
+.sceneNote b{font-family:var(--font-d);font-weight:700;color:var(--ink)}
+.hit{fill:transparent;cursor:pointer}
+.hit:focus-visible{outline:none;stroke:#FFE9A8;stroke-width:3;stroke-dasharray:4 4}
+.selframe{fill:none;stroke:#FFE9A8;stroke-width:2.5;stroke-dasharray:7 6;animation:march 1s linear infinite;transition:x .35s cubic-bezier(.3,1.3,.5,1)}
+@keyframes march{to{stroke-dashoffset:-26}}
+.cloud{animation:drift var(--dur,80s) linear infinite;animation-delay:var(--delay,0s);fill:var(--cloud,#fff)}
+@keyframes drift{from{transform:translateX(-320px)}to{transform:translateX(1350px)}}
+.wave{animation:wave 4.2s linear infinite}
+.wave.w2{animation-duration:6.5s;animation-direction:reverse}
+@keyframes wave{to{transform:translateX(-200px)}}
+.water{transition:transform 1s cubic-bezier(.3,.7,.3,1)}
+.dot{transition:transform 1s cubic-bezier(.3,.7,.3,1)}
+.pulse{animation:pulse 1.8s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{50%{transform:scale(1.7);opacity:.35}}
+.sway{animation:sway 4.5s ease-in-out infinite;transform-origin:0 0;animation-delay:var(--sd,0s)}
+@keyframes sway{0%,100%{transform:rotate(-1.6deg)}50%{transform:rotate(1.8deg)}}
+.tilt{transition:transform 1.2s ease;transform-origin:0 0}
+.leaf{fill:var(--leafc,#4E9A3A);transition:transform 1.1s ease,fill 1.1s ease;transform-origin:0 0}
+.blade{fill:none;stroke:var(--leafc,#4E9A3A);stroke-width:3.2;stroke-linecap:round;transition:transform 1.1s ease,stroke 1.1s ease;transform-origin:0 0}
+.rain{opacity:0;transition:opacity 1.2s}
+.raining .rain{opacity:1}
+.drop{stroke:rgba(200,228,240,.85);stroke-width:1.6;stroke-linecap:round;animation:fall var(--fd,.8s) linear infinite;animation-delay:var(--fdl,0s)}
+@keyframes fall{from{transform:translateY(-40px)}to{transform:translateY(250px)}}
+.heatg{opacity:var(--heat,0);transition:opacity 1.5s}
+.heat{fill:none;stroke:rgba(255,236,190,.65);stroke-width:2;stroke-linecap:round;animation:rise 3.2s ease-in infinite;animation-delay:var(--hd,0s)}
+@keyframes rise{from{transform:translateY(6px);opacity:0}30%{opacity:1}to{transform:translateY(-36px);opacity:0}}
+.halo{animation:halo 5s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes halo{50%{transform:scale(1.18);opacity:.6}}
+.sig{fill:none;stroke:#8FE3C0;stroke-width:2;stroke-linecap:round;animation:sig 1.6s ease-out infinite;animation-delay:var(--sg,0s);opacity:0}
+@keyframes sig{0%{opacity:0}30%{opacity:1}100%{opacity:0;transform:translate(3px,-3px)}}
+.flow{stroke:#8ADCF0;stroke-width:3;stroke-dasharray:6 8;fill:none;opacity:0;transition:opacity .4s}
+.irr .flow{opacity:1;animation:flow .6s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-14}}
+.bubs{opacity:0;transition:opacity .4s}
+.irr .bubs{opacity:1}
+.bub{fill:#BFEFFB;animation:bub 1.5s ease-in infinite;animation-delay:var(--bd,0s)}
+@keyframes bub{from{transform:translateY(0);opacity:.9}to{transform:translateY(-70px);opacity:0}}
+.vh{transform-origin:0 0;transition:transform .5s cubic-bezier(.3,1.5,.5,1)}
+.irr .vh{transform:rotate(90deg)}
+.vbody{fill:#8B3A24;transition:fill .4s}
+.irr .vbody{fill:#2A9DB8}
+.tag{font-family:var(--font-d)}
+
+/* sections */
+section{padding:clamp(40px,7vw,84px) 0}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:clamp(28px,5vw,72px);align-items:start}
+@media(max-width:900px){.split{grid-template-columns:1fr}}
+.head{margin-bottom:22px}
+.head h2{position:relative;display:inline-block;padding-bottom:10px}
+.head h2::after{content:"";position:absolute;left:0;bottom:0;height:4px;width:100%;background:var(--leaf);border-radius:4px;transform-origin:left;transform:scaleX(0);transition:transform .9s .1s cubic-bezier(.2,.8,.2,1)}
+.head.in h2::after{transform:scaleX(1)}
+.head .serif{margin-top:10px;max-width:56ch}
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 20px}
+.field{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:baseline;margin:0 0 16px}
+.field label{font-weight:600;font-size:.98rem}
+.field output{font-weight:700;font-size:1.02rem}
+.field input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--leaf);height:28px;margin:0}
+.sub{font-size:.86rem;color:var(--ink2);grid-column:1/-1;margin-top:-4px}
+.zoneTabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.zoneTabs button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:.35em .9em;font-weight:600;cursor:pointer;transition:background .25s,color .25s,border-color .25s,transform .2s}
+.zoneTabs button:hover{transform:translateY(-1px)}
+.zoneTabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.decTitle{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.decTitle h3{font-size:1.7rem}
+.decTitle span{color:var(--ink2);font-weight:500}
+.stampRow{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin:18px 0 6px}
+.stamp{display:inline-block;font-weight:800;font-size:clamp(2.1rem,5vw,3.3rem);letter-spacing:.05em;line-height:1;padding:.14em .32em;border:4px double currentColor;border-radius:8px;transform:rotate(-5deg);color:var(--wait);min-width:3.2em;text-align:center;opacity:.95}
+.stamp.pop{animation:thunk .55s cubic-bezier(.2,1.5,.4,1)}
+@keyframes thunk{0%{transform:rotate(-16deg) scale(1.7);opacity:0}55%{opacity:1}100%{transform:rotate(-5deg) scale(1)}}
+.stamp[data-d="WAIT"]{color:var(--wait)}
+.stamp[data-d="REDUCE"]{color:var(--reduce)}
+.stamp[data-d="IRRIGATE"]{color:var(--irrigate)}
+.action{font-weight:700;font-size:1.2rem;max-width:20ch;line-height:1.2}
+.reason{margin:10px 0 20px;max-width:58ch}
+.gauge{position:relative;height:14px;border-radius:99px;background:var(--track);margin:26px 0 8px;overflow:visible}
+.gauge .fill{position:absolute;inset:0 auto 0 0;border-radius:99px;width:0;background:var(--wait);transition:width .9s cubic-bezier(.3,.8,.3,1),background .5s}
+.gauge .tick{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink2);opacity:.6}
+.gauge .cap{position:absolute;top:22px;font-size:.78rem;color:var(--ink2);transform:translateX(-50%);white-space:nowrap}
+.gaugeMeta{display:flex;justify-content:space-between;font-weight:600;margin-top:26px;font-size:.98rem}
+.why{list-style:none;padding:0;margin:20px 0 0;display:grid;gap:9px}
+.why li{display:grid;grid-template-columns:minmax(120px,1.2fr) 1.6fr 3.4ch;gap:10px;align-items:center;font-size:.94rem}
+.dv{position:relative;height:12px;background:var(--track);border-radius:6px}
+.dv::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1.5px;background:var(--ink2);opacity:.6}
+.dv i{position:absolute;top:0;bottom:0;border-radius:6px;transition:width .8s cubic-bezier(.3,.8,.3,1),left .8s cubic-bezier(.3,.8,.3,1)}
+.why b{text-align:right;font-weight:700}
+.spark{margin-top:26px}
+.spark svg{width:100%;height:76px;display:block}
+.spark p{font-size:.86rem;color:var(--ink2);margin-top:4px}
+.runrow{margin-top:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.runrow span{font-size:.92rem;color:var(--ink2)}
+
+.band{background:var(--bg2)}
+.opts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin-top:8px}
+@media(max-width:900px){.opts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.opts{grid-template-columns:1fr}}
+.opt{padding:20px 22px 22px;border-left:1.5px solid var(--line);position:relative;transition:background .4s}
+.opt:first-child{border-left:0;padding-left:0}
+@media(max-width:900px){.opt:nth-child(3){border-left:0;padding-left:0}.opt{border-top:1.5px solid var(--line)}.opt:nth-child(-n+2){border-top:0}}
+@media(max-width:520px){.opt{border-left:0;padding-left:0;border-top:1.5px solid var(--line)}.opt:first-child{border-top:0}}
+.opt h3{font-size:1.3rem}
+.opt .s{font-size:.88rem;color:var(--ink2)}
+.opt.rec{background:linear-gradient(to bottom,color-mix(in srgb,var(--leaf) 16%,transparent),transparent 70%)}
+.badge{position:absolute;top:-11px;right:16px;background:var(--leaf);color:#fff;font-size:.78rem;font-weight:700;padding:.15em .7em;border-radius:99px;opacity:0;transform:translateY(6px);transition:opacity .4s,transform .4s}
+.opt.rec .badge{opacity:1;transform:none}
+.bar{position:relative;height:16px;background:var(--track);border-radius:8px;margin:18px 0 6px}
+.bar i{position:absolute;inset:0 auto 0 0;border-radius:8px;transition:width .9s cubic-bezier(.3,.8,.3,1),background .5s}
+.bar u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);opacity:.55;text-decoration:none}
+.bigN{font-size:2.1rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.opt dl{margin:14px 0 0;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:.92rem}
+.opt dt{color:var(--ink2)}
+.opt dd{margin:0;font-weight:700;text-align:right}
+.opt p.n{font-family:var(--font-t);font-size:1rem;line-height:1.4;color:var(--ink2);margin-top:12px;min-height:3em}
+.barKey{font-size:.82rem;color:var(--ink2);margin-top:16px}
+
+.deep{background:var(--deep);color:var(--deepInk);clip-path:inset(0 0 0 0)}
+.deep .serif{color:var(--deepInk2)}
+.deep .head h2::after{background:#8ADCF0}
+.deep .field input[type=range]{accent-color:#8ADCF0}
+.deep{opacity:1}
+.wipe{clip-path:inset(0 100% 0 0);transition:clip-path 1.1s cubic-bezier(.7,0,.2,1)}
+.wipe.in{clip-path:inset(0 0 0 0)}
+.alloc{display:grid;gap:14px;margin-top:8px}
+.arow{display:grid;grid-template-columns:8.5ch 1fr 15ch;gap:14px;align-items:center}
+@media(max-width:640px){.arow{grid-template-columns:7ch 1fr;}.arow .at{grid-column:1/-1}}
+.arow strong{font-weight:700}
+.atrack{position:relative;height:22px;border-radius:11px;background:rgba(255,255,255,.1);overflow:hidden}
+.atrack .need{position:absolute;inset:0 auto 0 0;background:rgba(138,220,240,.28);border-radius:11px;transition:width .8s cubic-bezier(.3,.8,.3,1)}
+.atrack .got{position:absolute;inset:0 auto 0 0;background:#8ADCF0;border-radius:11px;transition:width .8s cubic-bezier(.3,.8,.3,1)}
+.at{font-size:.92rem;color:var(--deepInk2);text-align:right}
+.remain{margin-top:22px;font-size:1.05rem}
+.remain b{font-weight:800}
+
+.ledgerGrid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:clamp(28px,5vw,72px);align-items:start}
+@media(max-width:900px){.ledgerGrid{grid-template-columns:1fr}}
+#ledger{list-style:none;margin:0;padding:0;display:grid;gap:0}
+#ledger li{padding:14px 0 14px 18px;border-left:3px solid var(--line);position:relative;font-family:var(--font-t);font-size:1.04rem;line-height:1.5;color:var(--ink2)}
+#ledger li b{font-family:var(--font-d);color:var(--ink);font-weight:700}
+#ledger li.enter{animation:entry .8s cubic-bezier(.2,.8,.2,1)}
+#ledger li::before{content:"";position:absolute;left:-8px;top:20px;width:13px;height:13px;border-radius:50%;background:var(--leaf);box-shadow:0 0 0 4px var(--bg)}
+#ledger li.rainy::before{background:var(--wait)}
+@keyframes entry{from{opacity:0;transform:translateX(-24px);background:color-mix(in srgb,var(--leaf) 30%,transparent)}to{opacity:1;transform:none}}
+.empty{font-family:var(--font-t);color:var(--ink2);font-size:1.05rem}
+.tot .row{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1.5px solid var(--line);align-items:baseline}
+.tot .row span{color:var(--ink2);max-width:22ch}
+.tot .row b{font-size:1.6rem;font-weight:800;letter-spacing:-.02em}
+.tot .fine{margin-top:16px;font-size:.9rem}
+.pipe svg{width:100%;height:auto;min-width:720px}
+.pipeScroll{overflow-x:auto}
+.pipe .node rect{fill:var(--bg);stroke:var(--ink);stroke-width:2}
+.pipe .node text{fill:var(--ink);font-family:var(--font-d)}
+.pipe .node .t1{font-weight:700;font-size:15px}
+.pipe .node .t2{font-size:12px;fill:var(--ink2)}
+.pipe .lnk{fill:none;stroke:var(--ink2);stroke-width:2}
+.pipe .lnk.back{stroke-dasharray:6 6;stroke:var(--leaf)}
+.pipe .pk{fill:var(--leaf)}
+.pipe .cap{font-size:12.5px;fill:var(--ink2);font-family:var(--font-t);font-style:italic}
+footer{padding:44px 0 60px;border-top:1px solid var(--line)}
+footer p{max-width:70ch}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .wipe{clip-path:none}
+  .head h2::after{transform:scaleX(1)}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2C11 9.5 6 14 6 20a10 10 0 0020 0C26 14 21 9.5 16 2z" fill="#2F86A6"/><path d="M16 27c-1.5-4.5-1.2-8 0-12 3 2.2 4.6 5.3 4.6 8.6 0 1.9-.9 3.2-2.4 3.9z" fill="#8FD16B"/></svg>
+      <span>AquaSentinel AI</span>
+    </div>
+    <span class="clock" id="clock" aria-live="off">Day 1, 07:00</span><span class="backend-status" id="backendStatus">● Backend connecting…</span>
+    <div class="ctrl">
+      <button class="btn" id="playBtn" type="button">Pause</button>
+      <div class="seg" role="group" aria-label="Simulation speed">
+        <button type="button" data-speed="1" aria-pressed="false">1×</button>
+        <button type="button" data-speed="3" aria-pressed="true">3×</button>
+        <button type="button" data-speed="8" aria-pressed="false">8×</button>
+      </div>
+      <label class="switch"><input type="checkbox" id="auto" checked><span>Valves follow the AI</span></label>
+      <button class="btn ghost" id="resetBtn" type="button">Restart</button>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+  <div class="hero">
+    <h1><span>Predict the stress.</span><span>Save the water.</span><span>Protect the harvest.</span></h1>
+    <p class="serif">A working model of the AquaSentinel AI idea. Four plots report soil moisture, the model forecasts each plot's stress for the next 12 hours, and a WAIT, REDUCE or IRRIGATE call opens or keeps shut the valve. Tap a plot to see why.</p>
+  </div>
+
+  <div class="sceneBox">
+    <svg id="scene" viewBox="0 0 1000 660" role="img" aria-label="Cutaway of a field with four plots. Water levels in the soil, crops, sun, clouds and irrigation valves update live."></svg>
+  </div>
+  <p class="sceneNote" id="sceneNote"></p>
+</div>
+
+<section id="console">
+  <div class="wrap split">
+    <div>
+      <div class="head reveal"><h2>Change the weather and watch the calls change</h2>
+        <p class="serif">Pick a scenario or move the sliders. The model forecasts every plot again straight away.</p></div>
+      <div class="presets">
+        <button class="btn ghost" type="button" data-preset="heat">Heatwave</button>
+        <button class="btn ghost" type="button" data-preset="rain">Rain on the way</button>
+        <button class="btn ghost" type="button" data-preset="clear">Clear week</button>
+      </div>
+      <div class="field"><label for="fPeak">Afternoon high</label><output id="oPeak"></output><input id="fPeak" type="range" min="22" max="44" step="1"></div>
+      <div class="field"><label for="fHum">Humidity</label><output id="oHum"></output><input id="fHum" type="range" min="15" max="90" step="1"></div>
+      <div class="field"><label for="fRp">Chance of rain</label><output id="oRp"></output><input id="fRp" type="range" min="0" max="100" step="5"></div>
+      <div class="field"><label for="fRm">Rain if it comes</label><output id="oRm"></output><input id="fRm" type="range" min="0" max="30" step="1"></div>
+      <div class="field"><label for="fTank">Water in the tank</label><output id="oTank"></output><input id="fTank" type="range" min="0" max="3200" step="50"></div>
+      <div class="field"><label for="fProbe" id="lProbe">Soil probe reading</label><output id="oProbe"></output><input id="fProbe" type="range" min="8" max="44" step="0.5">
+        <p class="sub">Drag to feed the model a different reading for the selected plot.</p></div>
+    </div>
+
+    <div>
+      <div class="zoneTabs" id="tabs" role="group" aria-label="Choose a plot"></div>
+      <div class="decTitle"><h3 id="dzTitle">Plot D</h3><span id="dzSub"></span></div>
+      <div class="stampRow"><div class="stamp" id="stamp" data-d="WAIT">WAIT</div><div class="action" id="action"></div></div>
+      <p class="serif reason" id="reason" aria-live="polite"></p>
+      <div class="gauge" id="gauge"><div class="fill" id="gFill"></div>
+        <div class="tick" style="left:20%"></div><div class="tick" style="left:50%"></div>
+        <span class="cap" style="left:10%">wait</span><span class="cap" style="left:35%">reduce</span><span class="cap" style="left:75%">irrigate</span></div>
+      <div class="gaugeMeta"><span>Stress risk in 12 hours</span><span id="gNum">0 of 100</span></div>
+      <ul class="why" id="why" aria-label="What is driving the risk"></ul>
+      <div class="spark"><svg id="spark" viewBox="0 0 320 76" preserveAspectRatio="none" aria-hidden="true"></svg><p>Soil moisture in this plot over the last 24 simulated hours. The dashed line is its comfort level.</p></div>
+      <div class="runrow"><button class="btn" id="runNow" type="button">Irrigate this plot now</button><span id="runHint"></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="compare">
+  <div class="wrap">
+    <div class="head reveal"><h2 id="cmpTitle">Four ways to handle Plot D</h2>
+      <p class="serif">Each column shows where the soil would sit 12 hours from now. The dark ticks mark the wilting point, the comfort line and a full soil.</p></div>
+    <div class="opts" id="opts"></div>
+    <p class="barKey">Bar colour follows stress risk: blue is safe, amber is watch, red is trouble.</p>
+  </div>
+</section>
+
+<section class="deep wipe" id="budgetSec">
+  <div class="wrap">
+    <div class="head reveal"><h2>When water is short, the thirstiest plot drinks first</h2>
+      <p class="serif">Set a daily budget. The system ranks plots by risk and hands out litres from the top until the budget or the tank runs out.</p></div>
+    <div class="field" style="max-width:560px"><label for="fBud">Water budget for the day</label><output id="oBud"></output><input id="fBud" type="range" min="0" max="2000" step="50"></div>
+    <div class="alloc" id="alloc"></div>
+    <p class="remain" id="remain"></p>
+  </div>
+</section>
+
+<section id="loop">
+  <div class="wrap ledgerGrid">
+    <div>
+      <div class="head reveal"><h2>What the valves did and what the soil said back</h2>
+        <p class="serif">Each time a valve closes, the flow sensor and soil probe report in. The model compares them with its forecast and corrects itself.</p></div>
+      <ol id="ledger" aria-live="polite"></ol>
+      <p class="empty" id="ledgerEmpty">Nothing logged yet. The first entry appears when a valve closes.</p>
+    </div>
+    <div class="tot">
+      <div class="head reveal"><h2>Running totals</h2></div>
+      <div class="row"><span>Water the AI used</span><b id="tUsed">0 L</b></div>
+      <div class="row"><span>A fixed 5 mm a day schedule over the same time</span><b id="tFixed">0 L</b></div>
+      <div class="row"><span>Plot-hours below the stress line</span><b id="tStress">0.0</b></div>
+      <p class="serif fine">These figures come from the prototype's own soil model, so read them as a demonstration and not as a measured saving. Field validation is the next step.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="path">
+  <div class="wrap pipe">
+    <div class="head reveal"><h2>How a reading becomes a turning valve</h2>
+      <p class="serif">Everything on this page follows the architecture from the pitch. The numbers under each stage are live.</p></div>
+    <div class="pipeScroll"><svg id="pipe" viewBox="0 0 1000 320" role="img" aria-label="Data flow: probes to ESP32 node to AI model and water and climate inputs, then decision engine, then valves, with a feedback loop back to the probes."></svg></div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="serif">Built by Team Nirman for the PCCOE International Grand Challenge 2026, theme AI for Climate Change. Sensor readings and weather here are simulated. The decision logic, water budget and learning loop run for real in your browser.</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const clamp = (x,a,b) => Math.min(b,Math.max(a,x));
+const hexv = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16));
+const mix = (a,b,t) => { const pa=hexv(a), pb=hexv(b); return '#'+pa.map((v,i)=>Math.round(v+(pb[i]-v)*t).toString(16).padStart(2,'0')).join(''); };
+const NS = 'http://www.w3.org/2000/svg';
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const Lf = n => Math.round(n).toLocaleString('en-IN');
+
+/* ---------- model ---------- */
+const WILT=14, FC=38, MAXM=44, LOSSK=1.6, HORIZON=12, FIXED_MM=5;
+const DEFS = [
+  {id:'A',name:'Plot A',crop:'Tomato',stage:'Flowering',kc:1.15,area:80,lo:28,dry:1.0,trueK:1.42,m0:31,kind:'tomato'},
+  {id:'B',name:'Plot B',crop:'Chilli',stage:'Vegetative',kc:0.85,area:60,lo:24,dry:1.1,trueK:1.72,m0:26,kind:'chilli'},
+  {id:'C',name:'Plot C',crop:'Okra',stage:'Seedling',kc:0.5,area:50,lo:20,dry:0.9,trueK:1.6,m0:28,kind:'okra'},
+  {id:'D',name:'Plot D',crop:'Onion',stage:'Bulb growth',kc:0.95,area:70,lo:24,dry:1.25,trueK:1.5,m0:22,kind:'onion'}
+];
+const ENV0 = {peak:33,hum:45,rainProb:20,rainMm:6,tank:2600,budget:1100};
+const TOTAL_AREA = DEFS.reduce((s,d)=>s+d.area,0);
+let zones, env, sim, rain, sel = 3;
+
+function freshState(){
+  zones = DEFS.map(d => ({...d, m:d.m0, estK:1.6, pump:null, hist:[], an:null}));
+  env = {...ENV0};
+  sim = {t:7*60, paused:false, speed:3, usedToday:0, usedTotal:0, fixedTotal:0, stressPH:0, auto:true, lastHr:-1, day:1};
+  rain = null;
+}
+const sunF = h => { const x=((h%24+24)%24-6)/12; return x>0&&x<1 ? Math.sin(Math.PI*x) : 0; };
+const tempAt = h => env.peak - 4 + 4*Math.sin(2*Math.PI*(h-9)/24);
+const etHour = (h,kc,peak,hum) => kc*Math.max(0.5,0.11*(peak-6))*(1+(55-hum)/120)*sunF(h)/7.64;
+const lossOver = (t0,hrs,z,o) => { let s=0; for(let i=0;i<hrs;i++) s+=etHour(t0/60+i+0.5,o.kc,o.peak,o.hum); return s*LOSSK*z.dry; };
+const riskAt = (x,lo) => 100*clamp((lo+3-x)/(lo+3-WILT),0,1);
+
+function analyse(z){
+  const o1={kc:.85,peak:env.peak,hum:55}, o2={kc:.85,peak:env.peak,hum:env.hum}, o3={kc:z.kc,peak:env.peak,hum:env.hum};
+  const l1=lossOver(sim.t,HORIZON,z,o1), l2=lossOver(sim.t,HORIZON,z,o2), l3=lossOver(sim.t,HORIZON,z,o3);
+  const rainGain=(env.rainProb/100)*env.rainMm*z.estK*0.7;
+  const pending=z.pump ? z.pump.rem*z.estK : 0;
+  const m=z.m;
+  const r0=riskAt(m,z.lo), r1=riskAt(m-l1,z.lo), r2=riskAt(m-l2,z.lo), r3=riskAt(m-l3,z.lo);
+  const r3b=riskAt(m-l3+rainGain,z.lo);
+  const p=clamp(m-l3+rainGain+pending,WILT-2,FC);
+  const risk=riskAt(p,z.lo);
+  const factors=[
+    {k:'soil',label:'Soil right now',v:r0},
+    {k:'heat',label:'Daytime heat',v:r1-r0},
+    {k:'air',label:env.hum<55?'Dry air':'Humid air',v:r2-r1},
+    {k:'stage',label:'Crop stage: '+z.stage.toLowerCase(),v:r3-r2},
+    {k:'rain',label:'Rain expected',v:r3b-r3},
+    {k:'flow',label:'Water already flowing',v:risk-r3b}
+  ];
+  const target=z.lo+5;
+  const needPct=Math.max(0,target-p);
+  const needMm=needPct/z.estK;
+  let dec='WAIT',frac=0;
+  if(risk>=50){dec='IRRIGATE';frac=1}else if(risk>=20){dec='REDUCE';frac=.5}
+  const planMm=needMm*frac;
+  return {l3,rainGain,pending,p,risk,factors,target,needPct,needMm,dec,frac,planMm,planL:planMm*z.area,
+          rainHelps:dec==='WAIT'&&r3>=20&&r3b<20, riskNow:r0};
+}
+function analyseAll(){ zones.forEach(z=>z.an=(backendReady && z.backendAn) ? z.backendAn : analyse(z)); }
+function allocate(){
+  const pendingL=zones.reduce((s,z)=>s+(z.pump?z.pump.rem*z.area:0),0);
+  const avail=Math.max(0,Math.min(env.budget-sim.usedToday-pendingL,env.tank-pendingL));
+  let left=avail; const out={};
+  [...zones].sort((a,b)=>b.an.risk-a.an.risk).forEach(z=>{
+    const need=z.pump?0:z.an.planL; const a=Math.min(need,left); left-=a; out[z.id]=a;
+  });
+  return {avail,out,left};
+}
+const clockStr = t => { const d=Math.floor(t/1440)+1, hh=Math.floor((t%1440)/60), mm=Math.floor(t%60); return `Day ${d}, ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`; };
+
+/* ---------- ledger ---------- */
+const ledgerEl=$('#ledger'), ledgerEmpty=$('#ledgerEmpty');
+function logEntry(html,cls){
+  ledgerEmpty.style.display='none';
+  const li=document.createElement('li'); li.className='enter '+(cls||''); li.innerHTML=html;
+  ledgerEl.prepend(li);
+  while(ledgerEl.children.length>7) ledgerEl.lastChild.remove();
+}
+function startPump(z,mm){
+  if(z.pump||mm<0.05) return;
+  z.pump={rem:mm,planMm:mm,delivered:0,gainSum:0,estK:z.estK,dec:z.an.dec};
+}
+function finishPump(z,why){
+  const p=z.pump; if(!p) return; z.pump=null;
+  const measured=p.delivered*z.area*(1+(Math.random()-.5)*.08);
+  const obsGain=p.gainSum*(1+(Math.random()-.5)*.06);
+  const expected=p.delivered*p.estK;
+  const obsK=p.delivered>0.05?obsGain/p.delivered:z.estK;
+  const old=z.estK; z.estK=clamp(0.7*z.estK+0.3*obsK,1.0,2.2);
+  const plannedL=p.planMm*z.area;
+  logEntry(`<b>${clockStr(sim.t)}, ${z.name} (${z.crop}), ${p.dec}.</b> Planned ${Lf(plannedL)} L, the flow sensor counted ${Lf(measured)} L${why?' ('+why+')':''}. The soil probe rose ${obsGain.toFixed(1)} points against ${expected.toFixed(1)} expected, so the response estimate moved from ${old.toFixed(2)} to ${z.estK.toFixed(2)} points per mm.`);
+}
+
+/* ---------- simulation step ---------- */
+function scheduleRain(){
+  if(env.rainProb<=0||env.rainMm<=0){rain=null;return}
+  rain={start:sim.t+60+Math.random()*240,dur:120,happens:Math.random()*100<env.rainProb,mm:env.rainMm,prob:env.rainProb,got:0};
+}
+function step(dt){
+  const h=sim.t/60;
+  const day=Math.floor(sim.t/1440)+1; if(day!==sim.day){sim.day=day;sim.usedToday=0}
+  let mmTick=0;
+  if(rain){
+    if(sim.t>=rain.start&&sim.t<rain.start+rain.dur&&rain.happens){mmTick=rain.mm*dt/rain.dur;rain.got+=mmTick}
+    if(sim.t>=rain.start+rain.dur){
+      if(rain.happens) logEntry(`<b>${clockStr(sim.t)}, rain.</b> ${rain.got.toFixed(0)} mm fell on the field. The forecast had said ${rain.prob}% for ${rain.mm} mm. The soil probes registered it and the forecast reset.`,'rainy');
+      else logEntry(`<b>${clockStr(sim.t)}, forecast rain did not come.</b> It had been ${rain.prob}% likely. Plots that waited for it are re-forecast with dry skies.`,'rainy');
+      rain=null; env.rainProb=8; env.rainMm=2; syncInputs();
+    }
+  }
+  sim.raining = mmTick>0;
+  zones.forEach(z=>{
+    const et=etHour(h+dt/120,z.kc,env.peak,env.hum)*(dt/60)*LOSSK*z.dry*(1+0.06*(Math.random()-.5));
+    z.m-=et;
+    if(mmTick>0) z.m+=mmTick*z.trueK*0.7;
+    if(z.pump){
+      const p=z.pump; let mm=Math.min(p.rem,2.5*dt/60,env.tank/z.area);
+      if(mm<=0.001){finishPump(z,'tank ran dry')}
+      else{
+        z.m+=mm*z.trueK; p.gainSum+=mm*z.trueK; p.delivered+=mm; p.rem-=mm;
+        env.tank-=mm*z.area; sim.usedToday+=mm*z.area; sim.usedTotal+=mm*z.area;
+        if(p.rem<=0.01) finishPump(z);
+      }
+    }
+    if(z.m>FC) z.m=FC+(z.m-FC)*0.6;
+    z.m=clamp(z.m,WILT-3,FC+4);
+    if(riskAt(z.m,z.lo)>=50) sim.stressPH+=dt/60;
+    z.hist.push({t:sim.t,m:z.m});
+    while(z.hist.length&&z.hist[0].t<sim.t-1440) z.hist.shift();
+  });
+  sim.fixedTotal+=dt/60/24*FIXED_MM*TOTAL_AREA;
+  sim.t+=dt;
+  analyseAll();
+  const hr=Math.floor(sim.t/60);
+  if(hr!==sim.lastHr){
+    sim.lastHr=hr;
+    if(sim.auto){
+      const al=allocate();
+      zones.forEach(z=>{
+        const a=al.out[z.id];
+        if(z.an.dec!=='WAIT'&&!z.pump&&a>=20) startPump(z,a/z.area);
+      });
+    }
+  }
+}
+
+/* ---------- scene ---------- */
+const scene=$('#scene');
+const ZX=[130,350,570,790], ZW=200, WY=272, WH=262, WB=WY+WH, GY=250;
+const yFor = m => WB-(clamp(m,0,MAXM)/MAXM)*WH;
+const el=(n,attrs,parent)=>{const e=document.createElementNS(NS,n);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e};
+const ZG=[]; let skyTop,skyBot,sunG,moonG,starsG,packets,tankWater,tankTxt,nodeG;
+
+function plantSVG(kind,x,s){
+  let h='';
+  const leaf=(y,side,sc)=>`<g transform="translate(0,${y}) scale(${sc})"><path class="leaf" data-base="${side>0?-20:20}" data-dir="${side}" d="${side>0?'M0 0C10 -11 22 -9 27 1C17 5 6 4 0 0Z':'M0 0C-10 -11 -22 -9 -27 1C-17 5 -6 4 0 0Z'}"/></g>`;
+  if(kind==='tomato'){
+    h=`<path d="M0 0C-2 -20 2 -40 0 -64" stroke="#3E6B2C" stroke-width="2.6" fill="none" stroke-linecap="round"/>`+
+      [-22,-38,-54].map(y=>leaf(y,1,1)+leaf(y-3,-1,1)).join('')+
+      `<circle cx="7" cy="-30" r="3.6" fill="#C8442C"/><circle cx="-8" cy="-44" r="3.2" fill="#D24F2F"/>`;
+  }else if(kind==='chilli'){
+    h=`<path d="M0 0C-1 -14 1 -30 0 -46" stroke="#3E6B2C" stroke-width="2.3" fill="none" stroke-linecap="round"/>`+
+      [-18,-32,-44].map(y=>leaf(y,1,.8)+leaf(y-2,-1,.8)).join('')+
+      `<ellipse cx="8" cy="-24" rx="1.7" ry="5.5" fill="#C23A22"/><ellipse cx="-8" cy="-36" rx="1.6" ry="5" fill="#D64B2A"/>`;
+  }else if(kind==='okra'){
+    h=`<path d="M0 0C0 -8 0 -16 0 -25" stroke="#3E6B2C" stroke-width="2.2" fill="none" stroke-linecap="round"/>`+leaf(-18,1,.85)+leaf(-20,-1,.85)+leaf(-25,1,.6)+leaf(-25,-1,.6);
+  }else{
+    const b=(dx,ex,ey,side)=>`<path class="blade" data-base="${side*4}" data-dir="${side}" d="M${dx} 0C${dx+ex*.3} ${ey*.4} ${dx+ex*.7} ${ey*.8} ${dx+ex} ${ey}"/>`;
+    h=b(-3,-7,-34,-1)+b(-1,-2,-40,-1)+b(1,3,-38,1)+b(3,8,-32,1);
+  }
+  return `<g transform="translate(${x},${GY}) scale(${s})"><g class="tilt"><g class="sway" style="--sd:${(-Math.random()*4).toFixed(2)}s">${h}</g></g></g>`;
+}
+
+function buildScene(){
+  scene.innerHTML='';
+  const defs=el('defs',{},scene);
+  const sg=el('linearGradient',{id:'skyG',x1:0,y1:0,x2:0,y2:1},defs);
+  skyTop=el('stop',{offset:'0',
+  'stop-color':'#78B4D6'},sg); skyBot=el('stop',{offset:'1','stop-color':'#CDE6E6'},sg);
+  const so=el('linearGradient',{id:'soilG',x1:0,y1:0,x2:0,y2:1},defs);
+  el('stop',{offset:'0','stop-color':'#5D402C'},so); el('stop',{offset:'1','stop-color':'#33231A'},so);
+  const dg=el('linearGradient',{id:'dryG',x1:0,y1:0,x2:0,y2:1},defs);
+  el('stop',{offset:'0','stop-color':'#D9BC8C'},dg); el('stop',{offset:'1','stop-color':'#B48F5E'},dg);
+  const wg=el('linearGradient',{id:'wetG',x1:0,y1:0,x2:0,y2:1},defs);
+  el('stop',{offset:'0','stop-color':'#3E9BBB','stop-opacity':.92},wg); el('stop',{offset:'1','stop-color':'#1F6486','stop-opacity':.95},wg);
+  ZX.forEach((x,i)=>{const c=el('clipPath',{id:'clip'+i},defs);el('rect',{x,y:WY,width:ZW,height:WH,rx:5},c)});
+  const ct=el('clipPath',{id:'clipT'},defs); el('rect',{x:20,y:424,width:80,height:172,rx:9},ct);
+
+  el('rect',{x:0,y:0,width:1000,height:GY,fill:'url(#skyG)'},scene);
+  starsG=el('g',{},scene);
+  for(let i=0;i<34;i++) el('circle',{cx:(Math.random()*1000).toFixed(0),cy:(Math.random()*170).toFixed(0),r:(Math.random()*1.3+.5).toFixed(1),fill:'#EAF3F8'},starsG);
+  sunG=el('g',{style:'transition:transform .5s linear,opacity .8s'},scene);
+  el('circle',{r:44,fill:'rgba(255,214,102,.28)',class:'halo'},sunG); el('circle',{r:25,fill:'#FFD25A'},sunG);
+  moonG=el('g',{style:'transition:transform .5s linear,opacity .8s'},scene);
+  el('circle',{r:19,fill:'#E6EEF4'},moonG); el('circle',{cx:7,cy:-4,r:16,fill:'#2A4356',opacity:.28},moonG);
+  el('path',{d:'M0 250C150 214 300 238 450 222S750 204 1000 232V250Z',fill:'#4F7F58',opacity:.32},scene);
+  el('path',{d:'M0 250C200 232 380 246 560 236S860 226 1000 244V250Z',fill:'#3F6E4A',opacity:.45},scene);
+  [[40,70,1.1,90,-5],[300,40,.8,120,-60],[560,96,1.3,75,-20],[820,58,.9,105,-90]].forEach(([x,y,s,d,dl])=>{
+    const g=el('g',{class:'cloud',style:`--dur:${d}s;--delay:${dl}s`},scene);
+    const c=el('g',{transform:`translate(${x},${y}) scale(${s})`},g);
+    [[0,0,30,16],[26,-9,26,17],[54,0,32,15],[24,6,44,13]].forEach(([cx,cy,rx,ry])=>el('ellipse',{cx,cy,rx,ry},c));
+  });
+  const rg=el('g',{class:'rain'},scene);
+  for(let i=0;i<70;i++){const x=Math.random()*1000;el('line',{x1:x,y1:0,x2:x-4,y2:14,class:'drop',style:`--fd:${(.55+Math.random()*.5).toFixed(2)}s;--fdl:${(-Math.random()).toFixed(2)}s`},rg)}
+  const hg=el('g',{class:'heatg'},scene);
+  for(let i=0;i<9;i++){const x=150+i*95;el('path',{d:`M${x} 246q7 -11 0 -22t0 -22`,class:'heat',style:`--hd:${(-Math.random()*3).toFixed(2)}s`},hg)}
+
+  el('rect',{x:0,y:GY,width:1000,height:12,fill:'#3F6E2C'},scene);
+  el('rect',{x:0,y:GY+12,width:1000,height:400,fill:'url(#soilG)'},scene);
+  for(let i=0;i<90;i++) el('circle',{cx:(Math.random()*1000).toFixed(0),cy:(GY+20+Math.random()*380).toFixed(0),r:(Math.random()*2.2+.6).toFixed(1),fill:Math.random()>.5?'#7A5A40':'#2A1C14',opacity:.5},scene);
+
+  // node
+  nodeG=el('g',{},scene);
+  el('rect',{x:34,y:198,width:62,height:40,rx:6,fill:'#EFF5F2',stroke:'#20423F','stroke-width':2},nodeG);
+  el('rect',{x:44,y:208,width:24,height:14,rx:2,fill:'#20423F'},nodeG);
+  el('circle',{cx:82,cy:215,r:3.5,fill:'#5FCB8F',class:'pulse'},nodeG);
+  el('line',{x1:65,y1:198,x2:65,y2:178,stroke:'#20423F','stroke-width':2.5},nodeG);
+  [10,17,24].forEach((r,i)=>el('path',{d:`M${65-r*.7} ${178-r*.7}A${r} ${r} 0 0 1 ${65+r*.7} ${178-r*.7}`,class:'sig',style:`--sg:${i*.25}s`},nodeG));
+  el('text',{x:65,y:232,'text-anchor':'middle','font-size':10,'font-weight':700,fill:'#20423F',class:'tag'},nodeG).textContent='ESP32';
+  packets=el('g',{},scene);
+
+  // tank + pipe
+  el('rect',{x:16,y:420,width:88,height:180,rx:11,fill:'#241812',stroke:'#8A6B4E','stroke-width':2.5},scene);
+  const tg=el('g',{'clip-path':'url(#clipT)'},scene);
+  tankWater=el('rect',{x:20,y:424,width:80,height:172,fill:'url(#wetG)',style:'transition:transform 1s,height 1s'},tg);
+  tankTxt=el('text',{x:60,y:640,'text-anchor':'middle','font-size':12.5,fill:'#D9CBB4',class:'tag'},scene);
+  el('text',{x:60,y:622,'text-anchor':'middle','font-size':15,'font-weight':700,fill:'#F3EBDD',class:'tag'},scene).textContent='Tank';
+  el('path',{d:'M104 590H990',stroke:'#5F726F','stroke-width':11,'stroke-linecap':'round',fill:'none'},scene);
+  el('path',{d:'M104 590H990',stroke:'#93ABA6','stroke-width':4,'stroke-linecap':'round',fill:'none'},scene);
+
+  DEFS.forEach((d,i)=>{
+    const x=ZX[i], g=el('g',{},scene), o={el:g,leaves:[]};
+    el('rect',{x,y:WY,width:ZW,height:WH,rx:5,fill:'url(#dryG)'},g);
+    const cg=el('g',{'clip-path':`url(#clip${i})`},g);
+    o.water=el('g',{class:'water',style:`transform:translate(${x}px,${yFor(d.m0)}px)`},cg);
+    const wv=(cls,op)=>el('path',{class:'wave '+cls,d:'M0 0q25 -8 50 0t50 0t50 0t50 0t50 0t50 0t50 0t50 0V320H0Z',fill:'url(#wetG)',opacity:op},o.water);
+    wv('w2',.55); wv('',1);
+    [[d.lo,'comfort line'],[WILT,'wilting point'],[FC,'full']].forEach(([m,t])=>{
+      const y=yFor(m);
+      el('line',{x1:x+3,x2:x+ZW-3,y1:y,y2:y,stroke:'#231610','stroke-width':1.4,'stroke-dasharray':'5 4',opacity:.75},g);
+      const tx=el('text',{x:x+ZW-8,y:y-4,'text-anchor':'end','font-size':10.5,fill:'#1C110B',class:'tag',style:'paint-order:stroke;stroke:rgba(255,255,255,.65);stroke-width:3px'},g); tx.textContent=t;
+    });
+    el('rect',{x:x,y:WY,width:ZW,height:WH,rx:5,fill:'none',stroke:'#2A1C14','stroke-width':3},g);
+    // roots
+    for(let r=0;r<4;r++){const rx=x+34+r*44; el('path',{d:`M${rx} ${GY+12}C${rx-8} ${GY+40} ${rx+6} ${GY+58} ${rx-4} ${GY+80}`,stroke:'#6E4E35','stroke-width':1.6,fill:'none',opacity:.65},g)}
+    // probe
+    const px=x+100;
+    el('line',{x1:px,y1:222,x2:px,y2:WB-14,stroke:'#2B211A','stroke-width':3},g);
+    el('rect',{x:px-8,y:214,width:16,height:11,rx:2,fill:'#EFF5F2',stroke:'#20423F','stroke-width':1.5},g);
+    o.dot=el('g',{class:'dot',style:`transform:translate(${px}px,${yFor(d.m0)}px)`},g);
+    el('circle',{r:6,fill:'#FFE38A',class:'pulse'},o.dot); el('circle',{r:4.5,fill:'#FFF2C2',stroke:'#20423F','stroke-width':1.5},o.dot);
+    o.val=el('text',{x:10,y:4,'font-size':13,'font-weight':800,fill:'#1C110B',class:'tag',style:'paint-order:stroke;stroke:rgba(255,255,255,.8);stroke-width:3.5px'},o.dot);
+    // plants
+    o.plants=el('g',{},g);
+    [x+32,x+66,x+134,x+168].forEach((px2,k)=>{
+      const sc=d.kind==='tomato'?1:d.kind==='chilli'?1.08:d.kind==='okra'?1.2:1.15;
+      const tmp=document.createElementNS(NS,'g'); tmp.innerHTML=plantSVG(d.kind,px2,sc*(0.92+k%2*.14));
+      while(tmp.firstChild) o.plants.appendChild(tmp.firstChild);
+    });
+    o.leaves=[...o.plants.querySelectorAll('.leaf,.blade')];
+    o.tilts=[...o.plants.querySelectorAll('.tilt')];
+    // feeder + valve
+    const fx=px;
+    el('path',{d:`M${fx} 590V${WB}`,stroke:'#5F726F','stroke-width':8,fill:'none'},g);
+    el('path',{d:`M${fx} 590V${WB}`,class:'flow'},g);
+    const bg=el('g',{class:'bubs'},g);
+    [-12,0,12].forEach((dx,j)=>el('circle',{cx:fx+dx,cy:WB-6,r:3.4,class:'bub',style:`--bd:${(j*.45).toFixed(2)}s`},bg));
+    const vg=el('g',{transform:`translate(${fx},564)`},g);
+    el('circle',{r:12,class:'vbody',stroke:'#20140E','stroke-width':2},vg);
+    el('rect',{x:-11,y:-2.5,width:22,height:5,rx:2.5,fill:'#F3EBDD',class:'vh'},vg);
+    el('text',{x:x,y:622,'font-size':15,'font-weight':700,fill:'#F3EBDD',class:'tag'},g).textContent=d.name;
+    el('text',{x:x,y:640,'font-size':12.5,fill:'#D9CBB4',class:'tag'},g).textContent=`${d.crop}, ${d.stage.toLowerCase()}`;
+    const hit=el('rect',{x:x-8,y:120,width:ZW+16,height:530,class:'hit',tabindex:0,role:'button','aria-label':`Select ${d.name}, ${d.crop}`},g);
+    hit.addEventListener('click',()=>select(i));
+    hit.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(i)}});
+    ZG.push(o);
+  });
+  ZG.selframe=el('rect',{x:ZX[sel]-5,y:WY-5,width:ZW+10,height:WH+10,rx:8,class:'selframe'},scene);
+}
+
+let prevU={sun:0,moon:0};
+function placeCelestial(g,u,key){
+  const x=60+u*880, y=225-Math.sin(Math.PI*u)*175;
+  if(u<prevU[key]-.3){g.style.transition='none';g.style.transform=`translate(${x}px,${y}px)`;void g.getBoundingClientRect();g.style.transition=''}
+  else g.style.transform=`translate(${x}px,${y}px)`;
+  prevU[key]=u;
+}
+function paintScene(){
+  const h=(sim.t/60)%24, d=sunF(h), k=Math.min(1,d*2.4), cd=env.rainProb/100;
+  let top=mix('#0B1B2B','#78B4D6',k), bot=mix('#1E394B','#CDE6E6',k);
+  const w=(d>0&&d<.3)?(1-d/.3)*.75:0; bot=mix(bot,'#F0B46A',w);
+  top=mix(top,'#7A8C96',cd*.4*k);
+  skyTop.setAttribute('stop-color',top); skyBot.setAttribute('stop-color',bot);
+  scene.style.setProperty('--cloud',mix(mix('#F6FAFA','#8A9BA5',cd),'#33444F',(1-k)*.85));
+  scene.style.setProperty('--heat',String(d>0?clamp((env.peak-33)/7,0,1):0));
+  scene.classList.toggle('raining',!!sim.raining);
+  starsG.style.opacity=((1-k)*(1-cd*.8)).toFixed(2);
+  const uS=clamp((h-6)/12,0,1), uM=h>=18?(h-18)/12:h<6?(h+6)/12:0;
+  placeCelestial(sunG,uS,'sun'); placeCelestial(moonG,uM,'moon');
+  sunG.style.opacity=k.toFixed(2); moonG.style.opacity=(1-k).toFixed(2);
+  sunG.firstChild.nextSibling.setAttribute('fill',env.peak>=38?'#FFA53A':'#FFD25A');
+  zones.forEach((z,i)=>{
+    const o=ZG[i], y=yFor(z.m), px=ZX[i]+100;
+    o.water.style.transform=`translate(${ZX[i]}px,${y}px)`;
+    o.dot.style.transform=`translate(${px}px,${y}px)`;
+    o.val.textContent=z.m.toFixed(1)+'%';
+    const st=riskAt(z.m,z.lo)/100;
+    o.plants.style.setProperty('--leafc',mix('#4F9B3A','#B7A14B',st));
+    o.leaves.forEach(l=>l.style.transform=`rotate(${(+l.dataset.base)+(+l.dataset.dir)*st*(l.classList.contains('blade')?38:60)}deg)`);
+    o.tilts.forEach(t=>t.style.transform=`rotate(${(st*5).toFixed(1)}deg)`);
+    o.el.classList.toggle('irr',!!z.pump);
+  });
+  ZG.selframe.setAttribute('x',ZX[sel]-5);
+  const f=clamp(env.tank/3200,0,1);
+  tankWater.style.transform=`translateY(${(1-f)*172}px)`;
+  tankTxt.textContent=Lf(env.tank)+' L';
+}
+function sendPackets(){
+  if(reduce||document.hidden) return;
+  ZX.forEach((x,i)=>{
+    const c=el('circle',{r:4,fill:'#5FCB8F',cx:0,cy:0},packets);
+    const a=c.animate([{transform:`translate(${x+100}px,220px)`,opacity:1},{transform:'translate(70px,200px)',opacity:.2}],{duration:1100+i*120,easing:'ease-in'});
+    a.onfinish=()=>c.remove();
+  });
+}
+
+/* ---------- AquaSentinel FastAPI bridge ----------
+   The field UI remains the same. The browser sends its current simulated sensor
+   values to the real FastAPI backend and uses the backend recommendation/risk
+   in the decision panel and valve animation. Local physics still animates the
+   demo between backend syncs.
+   LOCAL DEMO ONLY: shared API key is intentionally in browser code.
+-------------------------------------------------------------------------- */
+const API_BASE = window.AQUA_API_BASE || (location.port === '8000' ? location.origin : 'http://127.0.0.1:8000');
+const API_KEY = window.AQUA_API_KEY || 'dev-key-change-me';
+let backendReady = false, backendBusy = false, backendLastSync = 0;
+
+async function api(path, options={}){
+  const headers = Object.assign({'Content-Type':'application/json','X-API-Key':API_KEY}, options.headers||{});
+  const r = await fetch(API_BASE + path, Object.assign({}, options, {headers}));
+  if(!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+
+const BACKEND_ZONES = [
+  {id:'A',name:'Plot A',crop:'tomato',stage:'mid',area_m2:80,lat:19.17,lon:73.24,device_id:'esp32-a',pump_flow_lpm:20,auto_mode:false},
+  {id:'B',name:'Plot B',crop:'maize',stage:'development',area_m2:60,lat:19.18,lon:73.25,device_id:'esp32-b',pump_flow_lpm:20,auto_mode:false},
+  {id:'C',name:'Plot C',crop:'cotton',stage:'initial',area_m2:50,lat:19.16,lon:73.23,device_id:'esp32-c',pump_flow_lpm:20,auto_mode:false},
+  {id:'D',name:'Plot D',crop:'wheat',stage:'mid',area_m2:70,lat:19.17,lon:73.26,device_id:'esp32-d',pump_flow_lpm:20,auto_mode:false}
+];
+
+function backendFactorMap(rec){
+  return (rec.factors||[]).map((f,i)=>({
+    k:'f'+i,label:f.factor||'Model factor',v:Number(f.impact||0)*100
+  }));
+}
+function backendAnalysis(rec,z){
+  if(!rec) return null;
+  const risk=Number(rec.stress_risk||0)*100;
+  const needMm=Number(rec.net_need_mm||rec.gross_need_mm||0);
+  const planL=Number(rec.volume_l||0);
+  const p=Number(rec.soil_moisture ?? z.m);
+  const rainHelps=(rec.reasons||[]).some(x=>/rain/i.test(x));
+  return {
+    dec:rec.action||'WAIT', risk, riskNow:risk,
+    factors:backendFactorMap(rec), target:Number(z.lo||20)+5,
+    needPct:Math.max(0,(Number(z.lo||20)+5)-p), needMm, planMm:needMm,
+    planL, pending:0, rainGain:0, l3:0, p,
+    rainHelps, backend:true, backendReasons:rec.reasons||[],
+    stressRiskWithoutRain:Number(rec.stress_risk_without_rain||rec.stress_risk||0)*100
+  };
+}
+
+async function ensureBackendZones(){
+  let existing=await api('/api/zones');
+  const have=new Set(existing.map(z=>z.id));
+  for(const z of BACKEND_ZONES){
+    if(!have.has(z.id)){
+      try{ await api('/api/zones',{method:'POST',body:JSON.stringify(z)}); }
+      catch(e){ console.warn('Zone setup failed for',z.id,e); }
+    }
+  }
+  return api('/api/zones');
+}
+
+async function pushTelemetryAndReadDashboard(){
+  if(backendBusy) return;
+  backendBusy=true;
+  try{
+    await ensureBackendZones();
+    const h=sim.t/60;
+    for(const z of zones){
+      const bz=BACKEND_ZONES.find(x=>x.id===z.id);
+      if(!bz) continue;
+      await api('/api/telemetry',{method:'POST',body:JSON.stringify({
+        device_id:bz.device_id,
+        soil_moisture:Number(clamp(z.m,0,100).toFixed(1)),
+        air_temp:Number(tempAt(h).toFixed(1)),
+        humidity:Number(clamp(env.hum,0,100)),
+        tank_pct:Number(clamp(env.tank/3200*100,0,100).toFixed(1)),
+        flow_lpm:z.pump ? Number(bz.pump_flow_lpm) : 0,
+        pump_on:Boolean(z.pump)
+      })});
+    }
+    const dash=await api('/api/dashboard');
+    const byId=new Map((dash.zones||[]).map(x=>[x.zone.id,x]));
+    zones.forEach(z=>{
+      const item=byId.get(z.id);
+      if(!item) return;
+      if(item.reading) z.m=Number(item.reading.soil_moisture);
+      if(item.recommendation) z.backendAn=backendAnalysis(item.recommendation,z);
+    });
+    backendReady=true;
+    backendLastSync=Date.now();
+    const status=$('#backendStatus');
+    status.textContent='● Backend connected'; status.dataset.ok='1';
+    analyseAll(); render();
+  }catch(e){
+    console.warn('AquaSentinel backend connection failed:',e);
+    const status=$('#backendStatus');
+    status.textContent='● Backend offline'; status.dataset.ok='0';
+    if(!backendReady){ analyseAll(); render(); }
+  }finally{ backendBusy=false; }
+}
+
+/* ---------- panels ---------- */
+const tabs=$('#tabs');
+function buildTabs(){
+  tabs.innerHTML='';
+  DEFS.forEach((d,i)=>{const b=document.createElement('button');b.type='button';b.textContent=d.name;b.dataset.i=i;b.setAttribute('aria-pressed',i===sel);b.addEventListener('click',()=>select(i));tabs.appendChild(b)});
+}
+function select(i){
+  sel=i; lastDec=null;
+  [...tabs.children].forEach((b,k)=>b.setAttribute('aria-pressed',k===i));
+  const z=zones[i]; $('#fProbe').value=z.m; $('#lProbe').textContent=`Soil probe reading, ${z.name}`;
+  paintScene(); paintPanels(true);
+}
+let lastDec=null;
+const optsEl=$('#opts');
+const OPTS=[{k:'wait',n:'Wait',s:'Keep the valve shut'},{k:'reduce',n:'Reduce',s:'Half of what is needed'},{k:'irrigate',n:'Irrigate',s:'Refill to the target level'},{k:'fixed',n:'Fixed schedule',s:'5 mm every day, ignoring the sky'}];
+function buildOpts(){
+  optsEl.innerHTML='';
+  OPTS.forEach(o=>{
+    const d=document.createElement('div'); d.className='opt'; d.id='opt-'+o.k;
+    d.innerHTML=`<span class="badge">Recommended</span><h3>${o.n}</h3><div class="s">${o.s}</div>
+      <div class="bar"><i></i><u data-t="wilt"></u><u data-t="lo"></u><u data-t="fc"></u></div>
+      <div class="bigN"><span class="rk">0</span><span style="font-size:1rem;font-weight:600;color:var(--ink2)"> risk</span></div>
+      <dl><dt>Soil in 12 h</dt><dd class="sm"></dd><dt>Water used</dt><dd class="wl"></dd></dl><p class="n"></p>`;
+    optsEl.appendChild(d);
+  });
+}
+const riskCol = r => r<20?'var(--wait)':r<50?'var(--reduce)':'var(--irrigate)';
+const budRows={};
+function buildBudget(){
+  const box=$('#alloc'); box.innerHTML='';
+  DEFS.forEach(d=>{
+    const r=document.createElement('div'); r.className='arow';
+    r.innerHTML=`<strong>${d.name}</strong><div class="atrack"><div class="need"></div><div class="got"></div></div><div class="at"></div>`;
+    box.appendChild(r); budRows[d.id]={need:r.querySelector('.need'),got:r.querySelector('.got'),at:r.querySelector('.at')};
+  });
+}
+const fmtSigned=v=>(v>=0?'+':'−')+Math.abs(Math.round(v));
+
+function paintPanels(force){
+  const z=zones[sel], a=z.an; if(!a) return;
+  $('#dzTitle').textContent=`${z.name}, ${z.crop}`;
+  $('#dzSub').textContent=`${z.stage}, ${z.area} m²`;
+  const st=$('#stamp');
+  if(lastDec!==a.dec){
+    st.textContent=a.dec; st.dataset.d=a.dec;
+    if(!reduce){st.classList.remove('pop');void st.offsetWidth;st.classList.add('pop')}
+    lastDec=a.dec;
+  }
+  let act;
+  if(z.pump) act=`Valve open, ${(z.pump.rem*z.area).toFixed(0)} L still to go.`;
+  else if(a.dec==='WAIT') act='No water needed now.';
+  else act=`Apply ${Lf(a.planL)} L (${a.planMm.toFixed(1)} mm).`;
+  $('#action').textContent=act;
+  const top=a.factors.filter(f=>f.v>2).sort((x,y)=>y.v-x.v).slice(0,2).map(f=>f.label.toLowerCase());
+  let why;
+  if(a.dec==='WAIT') why=z.pump?'Water is on its way and the forecast now shows no stress.':a.rainHelps?'Rain is likely to cover the gap, so the valve stays shut and the water stays in the tank.':'The soil holds enough water for the next 12 hours.';
+  else if(a.dec==='REDUCE') why=`Some stress is coming, but not enough for a full refill. Main drivers: ${top.join(' and ')||'soil dryness'}.`;
+  else why=`Stress is likely within 12 hours if nothing changes. Main drivers: ${top.join(' and ')||'soil dryness'}.`;
+  $('#reason').textContent=why;
+  $('#gFill').style.width=a.risk.toFixed(0)+'%'; $('#gFill').style.background=riskCol(a.risk);
+  $('#gNum').textContent=`${Math.round(a.risk)} of 100`;
+  const ul=$('#why');
+  if(!ul.children.length||force){
+    ul.innerHTML=a.factors.map(f=>`<li data-k="${f.k}"><span class="wl"></span><div class="dv"><i></i></div><b></b></li>`).join('');
+  }
+  [...ul.children].forEach((li,i)=>{
+    const f=a.factors[i]; li.querySelector('.wl').textContent=f.label;
+    const b=li.querySelector('i'), w=clamp(Math.abs(f.v)/60*50,0,50);
+    b.style.width=w+'%'; b.style.left=(f.v>=0?50:50-w)+'%'; b.style.background=f.v>=0?'var(--reduce)':'var(--wait)';
+    li.querySelector('b').textContent=fmtSigned(f.v);
+    li.style.display=(f.k==='flow'&&!z.pump)||(Math.abs(f.v)<1&&f.k!=='soil')?'none':'';
+  });
+  // sparkline
+  const sp=$('#spark'); const pts=z.hist;
+  if(pts.length>1){
+    const t0=sim.t-1440, X=t=>(t-t0)/1440*320, Y=m=>76-((clamp(m,8,44)-8)/36)*72-2;
+    const d=pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+' '+Y(p.m).toFixed(1)).join('');
+    sp.innerHTML=`<line x1="0" x2="320" y1="${Y(z.lo).toFixed(1)}" y2="${Y(z.lo).toFixed(1)}" stroke="var(--ink2)" stroke-width="1.2" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/><path d="${d}" fill="none" stroke="var(--wait)" stroke-width="2.4" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+  }
+  const al=allocate();
+  const btn=$('#runNow'); const can=!z.pump&&a.dec!=='WAIT'&&al.out[z.id]>=20;
+  btn.disabled=!can;
+  $('#runHint').textContent=z.pump?'Valve is already open.':a.dec==='WAIT'?'Nothing to do while the call is WAIT.':can?'':'Budget or tank has no water left for this plot.';
+  if(document.activeElement!==$('#fProbe')) $('#fProbe').value=z.m;
+  $('#oProbe').textContent=z.m.toFixed(1)+'%';
+  // compare
+  $('#cmpTitle').textContent=`Four ways to handle ${z.name} in the next 12 hours`;
+  const base=z.m-a.l3+a.rainGain+a.pending;
+  const fixedP=base+FIXED_MM*z.estK, waste=Math.max(0,fixedP-FC)/z.estK*z.area;
+  const vals={
+    wait:{p:base,L:0},
+    reduce:{p:base+a.needPct*.5,L:a.needMm*.5*z.area},
+    irrigate:{p:base+a.needPct,L:a.needMm*z.area},
+    fixed:{p:fixedP,L:FIXED_MM*z.area}
+  };
+  const notes={
+    wait: env.rainMm*env.rainProb>150?`Rain adds about ${a.rainGain.toFixed(1)} points here.`:'Only the day\'s heat acts on the soil.',
+    reduce: vals.reduce.L>env.tank?'More than the tank holds.':'Takes the edge off stress and saves the rest.',
+    irrigate: vals.irrigate.L>env.tank?'More than the tank holds.':vals.irrigate.L<5?'Soil already sits at the target.':'Brings the plot back to a comfortable level.',
+    fixed: waste>5?`About ${Lf(waste)} L would drain below the roots and be wasted.`:'Applied whatever the weather does.'
+  };
+  const recKey=a.dec==='WAIT'?'wait':a.dec==='REDUCE'?'reduce':'irrigate';
+  OPTS.forEach(o=>{
+    const d=$('#opt-'+o.k), v=vals[o.k], r=riskAt(clamp(v.p,WILT-2,FC),z.lo);
+    d.classList.toggle('rec',o.k===recKey);
+    const bar=d.querySelector('.bar i'); bar.style.width=(clamp(v.p,0,MAXM)/MAXM*100)+'%'; bar.style.background=riskCol(r);
+    const us=d.querySelectorAll('.bar u'); us[0].style.left=(WILT/MAXM*100)+'%'; us[1].style.left=(z.lo/MAXM*100)+'%'; us[2].style.left=(FC/MAXM*100)+'%';
+    d.querySelector('.rk').textContent=Math.round(r);
+    d.querySelector('.sm').textContent=clamp(v.p,0,FC).toFixed(1)+'%';
+    d.querySelector('.wl').textContent=Lf(v.L)+' L';
+    d.querySelector('.n').textContent=notes[o.k];
+  });
+}
+function paintGlobal(){
+  $('#clock').textContent=clockStr(sim.t);
+  const h=(sim.t/60)%24;
+  $('#sceneNote').innerHTML=`It is <b>${tempAt(h).toFixed(1)} °C</b> with <b>${env.hum}%</b> humidity and a <b>${env.rainProb}%</b> chance of ${env.rainMm} mm of rain. The tank holds <b>${Lf(env.tank)} L</b>, and <b>${Lf(sim.usedToday)} L</b> of today's <b>${Lf(env.budget)} L</b> budget has gone into the ground.`;
+  const al=allocate();
+  zones.forEach(z=>{
+    const r=budRows[z.id], need=z.pump?z.pump.rem*z.area:z.an.planL, got=al.out[z.id];
+    const cap=Math.max(600,...zones.map(q=>q.an.planL));
+    r.need.style.width=clamp(need/cap*100,0,100)+'%'; r.got.style.width=clamp(got/cap*100,0,100)+'%';
+    r.at.textContent=z.pump?`Watering, ${Lf(need)} L to go`:z.an.dec==='WAIT'?'Not needed':got>=need-1?`${z.an.dec}, ${Lf(got)} L`:got>0.5?`Partly, ${Lf(got)} of ${Lf(need)} L`:`Held back, needs ${Lf(need)} L`;
+  });
+  $('#remain').innerHTML=`<b>${Lf(al.avail)} L</b> can still be handed out today${env.tank<env.budget-sim.usedToday?', limited by the tank':''}.`;
+  $('#oBud').textContent=Lf(env.budget)+' L';
+  $('#tUsed').textContent=Lf(sim.usedTotal)+' L';
+  $('#tFixed').textContent=Lf(sim.fixedTotal)+' L';
+  $('#tStress').textContent=sim.stressPH.toFixed(1);
+  // pipeline live text
+  const P=id=>$('#'+id);
+  if(P('pp1')){
+    P('pp1').textContent=zones.map(z=>z.m.toFixed(0)).join(', ')+' %';
+    P('pp2').textContent='Sent at '+clockStr(sim.t).split(', ')[1];
+    P('pp3').textContent='Risk '+zones.map(z=>Math.round(z.an.risk)).join(', ');
+    P('pp4').textContent=`${Lf(env.tank)} L, ${env.rainProb}% rain`;
+    P('pp5').textContent=zones.map(z=>z.an.dec[0]+z.an.dec.slice(1).toLowerCase()).join(', ');
+    const open=zones.filter(z=>z.pump).length;
+    P('pp6').textContent=open?`${open} valve${open>1?'s':''} open`:'All valves shut';
+  }
+}
+function render(){ paintScene(); paintPanels(false); paintGlobal(); }
+
+/* ---------- pipeline diagram ---------- */
+function buildPipe(){
+  const s=$('#pipe'); s.innerHTML='';
+  const defs=el('defs',{},s);
+  const mk=el('marker',{id:'ar',viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto'},defs);
+  el('path',{d:'M0 0L10 5L0 10z',fill:'var(--ink2)'},mk);
+  const N=(x,y,w,h,t1,id,t2)=>{
+    const g=el('g',{class:'node'},s);
+    el('rect',{x,y,width:w,height:h,rx:12},g);
+    el('text',{x:x+w/2,y:y+h/2-4,'text-anchor':'middle',class:'t1'},g).textContent=t1;
+    el('text',{x:x+w/2,y:y+h/2+16,'text-anchor':'middle',class:'t2',id},g).textContent=t2;
+  };
+  N(10,110,150,74,'Field probes','pp1','');
+  N(210,110,150,74,'ESP32 node','pp2','');
+  N(430,28,170,74,'AI stress model','pp3','');
+  N(430,190,170,74,'Water and weather','pp4','');
+  N(660,110,150,74,'Decision engine','pp5','');
+  N(850,110,140,74,'Valves and pump','pp6','');
+  const links=[['M160 147H208','l1'],['M360 147C395 147 395 65 428 65','l2'],['M360 147C395 147 395 227 428 227','l3'],['M600 65C635 65 635 147 658 147','l4'],['M600 227C635 227 635 147 658 147','l5'],['M810 147H848','l6']];
+  links.forEach(([d,id])=>{el('path',{d,id,class:'lnk','marker-end':'url(#ar)'},s)});
+  el('path',{d:'M920 184V276H85V186',id:'lb',class:'lnk back','marker-end':'url(#ar)'},s);
+  el('text',{x:500,y:300,'text-anchor':'middle',class:'cap'},s).textContent='Flow sensor counts the litres, probes read the soil response, and the next forecast starts from that.';
+  if(!reduce){
+    [['l1',1.4],['l2',1.6],['l3',1.6],['l4',1.5],['l5',1.5],['l6',1.2],['lb',3.6]].forEach(([id,dur])=>{
+      for(let i=0;i<2;i++){
+        const c=el('circle',{r:4.2,class:'pk'},s);
+        const a=el('animateMotion',{dur:dur+'s',repeatCount:'indefinite',begin:(i*dur/2)+'s'},c);
+        el('mpath',{href:'#'+id},a);
+      }
+    });
+  }
+}
+
+/* ---------- inputs ---------- */
+function syncInputs(){
+  const set=(id,o,v,f)=>{const i=$(id);i.value=v;$(o).textContent=f(v)};
+  set('#fPeak','#oPeak',env.peak,v=>v+' °C'); set('#fHum','#oHum',env.hum,v=>v+'%');
+  set('#fRp','#oRp',env.rainProb,v=>v+'%'); set('#fRm','#oRm',env.rainMm,v=>v+' mm');
+  set('#fTank','#oTank',Math.round(env.tank),v=>Lf(v)+' L'); set('#fBud','#oBud',env.budget,v=>Lf(v)+' L');
+}
+function bindInputs(){
+  const bind=(id,key,resched)=>$(id).addEventListener('input',e=>{env[key]=+e.target.value;if(resched)scheduleRain();syncInputs();analyseAll();render();clearTimeout(window.__aquaSyncTimer);window.__aquaSyncTimer=setTimeout(pushTelemetryAndReadDashboard,350)});
+  bind('#fPeak','peak'); bind('#fHum','hum'); bind('#fRp','rainProb',true); bind('#fRm','rainMm',true); bind('#fTank','tank'); bind('#fBud','budget');
+  $('#fProbe').addEventListener('input',e=>{zones[sel].m=+e.target.value;analyseAll();render();clearTimeout(window.__aquaSyncTimer);window.__aquaSyncTimer=setTimeout(pushTelemetryAndReadDashboard,350)});
+  const P={heat:{peak:41,hum:24,rainProb:0,rainMm:0},rain:{peak:29,hum:78,rainProb:85,rainMm:14},clear:{peak:31,hum:50,rainProb:5,rainMm:0}};
+  document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>{Object.assign(env,P[b.dataset.preset]);scheduleRain();syncInputs();analyseAll();render()}));
+  $('#runNow').addEventListener('click',()=>{const z=zones[sel],al=allocate();startPump(z,al.out[z.id]/z.area);analyseAll();render()});
+  $('#playBtn').addEventListener('click',()=>{sim.paused=!sim.paused;$('#playBtn').textContent=sim.paused?'Play':'Pause'});
+  document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',()=>{sim.speed=+b.dataset.speed;document.querySelectorAll('[data-speed]').forEach(x=>x.setAttribute('aria-pressed',x===b))}));
+  $('#auto').addEventListener('change',e=>{sim.auto=e.target.checked});
+  $('#resetBtn').addEventListener('click',()=>{
+    const sp=sim.speed,au=$('#auto').checked;
+    freshState(); sim.speed=sp; sim.auto=au; ledgerEl.innerHTML=''; ledgerEmpty.style.display='';
+    prevU={sun:0,moon:0}; buildScene(); analyseAll(); syncInputs(); select(sel); scheduleRain();
+    $('#playBtn').textContent='Pause';
+  });
+}
+
+/* ---------- reveal ---------- */
+function bindReveal(){
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.25});
+  document.querySelectorAll('.reveal').forEach(n=>io.observe(n));
+  const wipe=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');wipe.unobserve(e.target)}}),{threshold:.08});
+  document.querySelectorAll('.wipe').forEach(n=>wipe.observe(n));
+}
+
+/* ---------- boot ---------- */
+freshState(); buildScene(); buildTabs(); buildOpts(); buildBudget(); buildPipe(); syncInputs(); bindInputs(); bindReveal();
+analyseAll(); select(sel); scheduleRain(); render();
+pushTelemetryAndReadDashboard();
+setInterval(pushTelemetryAndReadDashboard, 5000);
+let tickN=0;
+setInterval(()=>{
+  if(sim.paused) return;
+  step(6*sim.speed);
+  render();
+  if(++tickN%3===0) sendPackets();
+},500);
+window.__aqua={get zones(){return zones},get env(){return env},get sim(){return sim}};
+})();
+</script>
+</body>
+</html>
