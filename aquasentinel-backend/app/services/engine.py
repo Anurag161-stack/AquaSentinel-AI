@@ -105,22 +105,84 @@ class Engine:
         return [dict(r, time=iso(r["ts"])) for r in rows]
 
     def ingest(self, p: dict) -> dict:
-        """ESP32 telemetry. Returns the next pending command (if any) in the same round trip."""
+        """Receive ESP32 telemetry and return the next pending command."""
+
+        # Identify the registered ESP32 device.
         with self.db.conn() as c:
-            z = c.execute("SELECT id FROM zones WHERE device_id=?", (p["device_id"],)).fetchone()
+            z = c.execute(
+                "SELECT id FROM zones WHERE device_id=?",
+                (p["device_id"],)
+            ).fetchone()
+
         if not z:
-            raise NotFound(f"No zone registered for device '{p['device_id']}'")
-        zid, ts = z["id"], p.get("ts") or time.time()
-        with self.db.conn() as c:
-            c.execute("INSERT INTO readings(zone_id,ts,soil_moisture,air_temp,humidity,tank_pct,flow_lpm,pump_on)"
-                      " VALUES(?,?,?,?,?,?,?,?)",
-                      (zid, ts, p["soil_moisture"], p["air_temp"], p["humidity"], p.get("tank_pct"),
-                       p.get("flow_lpm", 0.0), int(bool(p.get("pump_on", False)))))
-        self._close_feedback(zid, ts, p["soil_moisture"])
+            raise NotFound(
+                f"No zone registered for device '{p['device_id']}'"
+            )
+
+        zid = z["id"]
         zone = self.get_zone(zid)
+
+        # Use physical environmental readings when supplied.
+        air_temp = p.get("air_temp")
+        humidity = p.get("humidity")
+
+        air_temp_source = "device" if air_temp is not None else None
+        humidity_source = "device" if humidity is not None else None
+
+        # Fill missing environmental readings from the configured weather provider.
+        if air_temp is None or humidity is None:
+            weather = self.weather.get(zone["lat"], zone["lon"])
+
+            if air_temp is None:
+                air_temp = weather.get("current_temp_c")
+                air_temp_source = weather.get("source", "unknown")
+
+            if humidity is None:
+                humidity = weather.get("current_humidity_pct")
+                humidity_source = weather.get("source", "unknown")
+
+        # Do not store incomplete environmental data or pass it to the AI model.
+        if air_temp is None or humidity is None:
+            raise Conflict(
+                "Temperature or humidity unavailable. "
+                "Check the weather provider or supply physical readings."
+            )
+
+        ts = p.get("ts") or time.time()
+
+        # Store the actual soil reading plus device/weather environmental data.
+        with self.db.conn() as c:
+            c.execute(
+                "INSERT INTO readings("
+                "zone_id,ts,soil_moisture,air_temp,humidity,"
+                "tank_pct,flow_lpm,pump_on"
+                ") VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    zid,
+                    ts,
+                    p["soil_moisture"],
+                    air_temp,
+                    humidity,
+                    p.get("tank_pct"),
+                    p.get("flow_lpm", 0.0),
+                    int(bool(p.get("pump_on", False)))
+                )
+            )
+
+        self._close_feedback(zid, ts, p["soil_moisture"])
+
+        # Keep the existing automatic-decision behavior.
         if zone["auto_mode"]:
             self._auto(zone)
-        return {"stored": True, "zone_id": zid, "command": self._claim_command(zid)}
+
+        # Return the next pending command, if any.
+        return {
+            "stored": True,
+            "zone_id": zid,
+            "command": self._claim_command(zid),
+            "air_temp_source": air_temp_source,
+            "humidity_source": humidity_source
+        }
 
     def _trend(self, zid, now):
         with self.db.conn() as c:

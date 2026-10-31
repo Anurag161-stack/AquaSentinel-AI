@@ -79,15 +79,20 @@ class ZonePatch(BaseModel):
     auto_mode: Optional[bool] = None
 
 
+
 class Telemetry(BaseModel):
     device_id: str
     soil_moisture: float = Field(ge=0, le=100)
-    air_temp: float = Field(ge=-20, le=70)
-    humidity: float = Field(ge=0, le=100)
+
+    # Optional: supplied by additional physical sensors
+    air_temp: Optional[float] = Field(default=None, ge=-20, le=70)
+    humidity: Optional[float] = Field(default=None, ge=0, le=100)
+
     tank_pct: Optional[float] = Field(default=None, ge=0, le=100)
     flow_lpm: float = Field(default=0.0, ge=0)
     pump_on: bool = False
     ts: Optional[float] = None
+
 
 
 class BudgetIn(BaseModel):
@@ -150,9 +155,11 @@ def patch_zone(zid: str, p: ZonePatch):
 
 
 # device ingestion (ESP32): returns the next pending command in the same round trip
+
 @app.post("/api/telemetry", dependencies=[Depends(require_key)])
 def telemetry(t: Telemetry):
-    return engine().ingest(t.model_dump())
+    return engine().ingest(t.model_dump(exclude_none=True))
+
 
 
 @app.post("/api/commands/{cid}/complete", dependencies=[Depends(require_key)])
