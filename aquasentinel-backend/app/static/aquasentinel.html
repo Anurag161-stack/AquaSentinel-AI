@@ -772,13 +772,18 @@ function sendPackets(){
    deployment. Replace this with a server-side read-only proxy before hosting.
 -------------------------------------------------------------------------- */
 const API_BASE = window.AQUA_API_BASE || location.origin;
-const API_KEY = window.AQUA_API_KEY || 'dev-key-change-me';
-async function api(path, options={}){
+
+async function api(path, options={}) {
   const headers = Object.assign(
-    {'Content-Type':'application/json','X-API-Key':API_KEY},
-    options.headers||{}
+    {'Content-Type':'application/json'},
+    options.headers || {}
   );
-  const r = await fetch(API_BASE + path, Object.assign({}, options, {headers}));
+
+  const r = await fetch(
+    API_BASE + path,
+    Object.assign({}, options, {headers})
+  );
+
   if(!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
 }
