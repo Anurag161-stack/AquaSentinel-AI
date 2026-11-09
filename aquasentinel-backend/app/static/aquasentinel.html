@@ -147,6 +147,7 @@ section{padding:clamp(40px,7vw,84px) 0}
 .stamp.pop{animation:thunk .55s cubic-bezier(.2,1.5,.4,1)}
 @keyframes thunk{0%{transform:rotate(-16deg) scale(1.7);opacity:0}55%{opacity:1}100%{transform:rotate(-5deg) scale(1)}}
 .stamp[data-d="WAIT"]{color:var(--wait)}
+.stamp[data-d="OFFLINE"]{color:var(--irrigate)}
 .stamp[data-d="REDUCE"]{color:var(--reduce)}
 .stamp[data-d="IRRIGATE"]{color:var(--irrigate)}
 .action{font-weight:700;font-size:1.2rem;max-width:20ch;line-height:1.2}
@@ -235,6 +236,14 @@ section{padding:clamp(40px,7vw,84px) 0}
 .pipe .cap{font-size:12.5px;fill:var(--ink2);font-family:var(--font-t);font-style:italic}
 footer{padding:44px 0 60px;border-top:1px solid var(--line)}
 footer p{max-width:70ch}
+.mode-switch{display:inline-flex;align-items:center;gap:4px;padding:3px;border:1.5px solid var(--line);border-radius:999px;background:var(--bg2)}
+.mode-btn{border:0;background:transparent;color:var(--ink2);border-radius:999px;padding:.42em .8em;font-size:.84rem;font-weight:700;cursor:pointer;white-space:nowrap}
+.mode-btn[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.mode-notice{margin:0 0 24px;padding:13px 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg2);color:var(--ink);font-size:.94rem;font-weight:600}
+.mode-notice[data-mode="live"]{border-color:var(--leaf)}
+.mode-notice[data-mode="simulation"]{border-color:var(--wait)}
+.mode-switch button:focus-visible{outline-offset:1px}
+button:disabled,input:disabled{cursor:not-allowed;opacity:.55}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
@@ -251,7 +260,11 @@ footer p{max-width:70ch}
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2C11 9.5 6 14 6 20a10 10 0 0020 0C26 14 21 9.5 16 2z" fill="#2F86A6"/><path d="M16 27c-1.5-4.5-1.2-8 0-12 3 2.2 4.6 5.3 4.6 8.6 0 1.9-.9 3.2-2.4 3.9z" fill="#8FD16B"/></svg>
       <span>AquaSentinel AI</span>
     </div>
-    <span class="clock" id="clock" aria-live="off">Day 1, 07:00</span><span class="backend-status" id="backendStatus">● Backend connecting…</span>
+    <div class="mode-switch" role="group" aria-label="Dashboard data mode">
+      <button class="mode-btn" id="modeSimBtn" type="button" aria-pressed="false">Simulation</button>
+      <button class="mode-btn" id="modeLiveBtn" type="button" aria-pressed="true">Live hardware</button>
+    </div>
+    <span class="clock" id="clock" aria-live="off">Dashboard · connecting</span><span class="backend-status" id="backendStatus" data-ok="0">● Backend connecting…</span>
     <div class="ctrl">
       <button class="btn" id="playBtn" type="button">Pause</button>
       <div class="seg" role="group" aria-label="Simulation speed">
@@ -269,7 +282,7 @@ footer p{max-width:70ch}
 <div class="wrap">
   <div class="hero">
     <h1><span>Predict the stress.</span><span>Save the water.</span><span>Protect the harvest.</span></h1>
-    <p class="serif">A working model of the AquaSentinel AI idea. Four plots report soil moisture, the model forecasts each plot's stress for the next 12 hours, and a WAIT, REDUCE or IRRIGATE call opens or keeps shut the valve. Tap a plot to see why.</p>
+    <p class="serif" id="heroCopy">Plot A receives its soil-moisture index from the physical ESP32. Plots B–D remain demo plots until additional devices are connected.</p>
   </div>
 
   <div class="sceneBox">
@@ -279,10 +292,15 @@ footer p{max-width:70ch}
 </div>
 
 <section id="console">
+  <div class="wrap">
+    <div class="mode-notice" id="modeNotice" data-mode="live" role="status">
+      Live hardware mode: Plot A uses ESP32 readings. Plots B–D are demo-only. Pump and valve commands are disabled.
+    </div>
+  </div>
   <div class="wrap split">
     <div>
       <div class="head reveal"><h2>Change the weather and watch the calls change</h2>
-        <p class="serif">Pick a scenario or move the sliders. The model forecasts every plot again straight away.</p></div>
+        <p class="serif" id="scenarioCopy">Scenario sliders affect demo plots only in Live Hardware mode; they never override Plot A's physical sensor reading.</p></div>
       <div class="presets">
         <button class="btn ghost" type="button" data-preset="heat">Heatwave</button>
         <button class="btn ghost" type="button" data-preset="rain">Rain on the way</button>
@@ -361,7 +379,7 @@ footer p{max-width:70ch}
 
 <footer>
   <div class="wrap">
-    <p class="serif">Built by Team Nirman for the PCCOE International Grand Challenge 2026, theme AI for Climate Change. Sensor readings and weather here are simulated. The decision logic, water budget and learning loop run for real in your browser.</p>
+    <p class="serif" id="footerCopy">Built by Team Nirman for the PCCOE International Grand Challenge 2026, theme AI for Climate Change. In Live Hardware mode, Plot A uses the ESP32 soil probe; Plots B–D and scenario controls remain simulated. Weather is forecast data. Pump and valve actuation is not connected in this build.</p>
   </div>
 </footer>
 
@@ -386,12 +404,35 @@ const DEFS = [
 ];
 const ENV0 = {peak:33,hum:45,rainProb:20,rainMm:6,tank:2600,budget:1100};
 const TOTAL_AREA = DEFS.reduce((s,d)=>s+d.area,0);
-let zones, env, sim, rain, sel = 3;
+let zones, env, sim, rain, sel = 0;
 let historySampleMinutes = 0;
+
+// Live mode is read-only: the browser fetches the ESP32's stored reading but
+// never posts simulated telemetry or issues pump/valve commands.
+let liveMode = true;
+let liveSensorSeen = false;          // A valid Plot A value has existed in storage.
+let liveSensorFresh = false;         // The stored value is recent enough to trust as live.
+let liveSensorIndex = null;
+let liveReadingTimestampMs = 0;      // Timestamp of the ESP32 sample, not the browser poll.
+let liveSensorAgeMs = Infinity;
+let liveLastSync = 0;                // Last successful browser <-> backend poll.
+let liveLastHistoryAt = 0;
+let liveLastHistoryReadingMs = 0;
+let backendReady = false;
+let backendBusy = false;
+const LIVE_ZONE_ID = 'A';
+const LIVE_STALE_AFTER_MS = 45_000;  // ESP32 posts every 15 seconds; allow 3 missed intervals.
+
+// The sensor reports a relative 0–100 moisture index. The field simulation
+// uses a 14–38 soil-water scale. Map for scene/model calculations only, while
+// retaining the original sensor index for display and data provenance.
+function sensorIndexToModel(index){
+  return WILT + (clamp(Number(index),0,100) / 100) * (FC - WILT);
+}
 
 function freshState(){
   historySampleMinutes = 0;
-  zones = DEFS.map(d => ({...d, m:d.m0, estK:1.6, pump:null, hist:[], an:null}));
+  zones = DEFS.map(d => ({...d, m:d.m0, sensorIndex:null, backendAn:null, estK:1.6, pump:null, hist:[], an:null}));
   env = {...ENV0};
   sim = {t:7*60, paused:false, speed:3, usedToday:0, usedTotal:0, fixedTotal:0, stressPH:0, auto:true, lastHr:-1, day:1};
   rain = null;
@@ -429,7 +470,18 @@ function analyse(z){
   return {l3,rainGain,pending,p,risk,factors,target,needPct,needMm,dec,frac,planMm,planL:planMm*z.area,
           rainHelps:dec==='WAIT'&&r3>=20&&r3b<20, riskNow:r0};
 }
-function analyseAll(){ zones.forEach(z=>z.an=(backendReady && z.backendAn) ? z.backendAn : analyse(z)); }
+function analyseAll(){
+  zones.forEach(z=>{
+    if(liveMode && z.id===LIVE_ZONE_ID && !liveSensorFresh){
+      // No model decision is shown from a stale or unverified Plot A sample.
+      z.an={dec:'WAIT',risk:0,riskNow:0,factors:[],target:z.lo+5,needPct:0,needMm:0,
+        planMm:0,planL:0,pending:0,rainGain:0,l3:0,p:z.m,rainHelps:false,backend:false,stale:true};
+      return;
+    }
+    const useHardwareRecommendation = liveMode && z.id===LIVE_ZONE_ID && z.backendAn;
+    z.an = useHardwareRecommendation ? z.backendAn : analyse(z);
+  });
+}
 function allocate(){
   const pendingL=zones.reduce((s,z)=>s+(z.pump?z.pump.rem*z.area:0),0);
   const avail=Math.max(0,Math.min(env.budget-sim.usedToday-pendingL,env.tank-pendingL));
@@ -686,7 +738,13 @@ function paintScene(){
     const o=ZG[i], y=yFor(z.m), px=ZX[i]+100;
     o.water.style.transform=`translate(${ZX[i]}px,${y}px)`;
     o.dot.style.transform=`translate(${px}px,${y}px)`;
-    o.val.textContent=z.m.toFixed(1)+'%';
+    if(liveMode){
+      o.val.textContent = i===0
+        ? (liveSensorFresh ? z.sensorIndex.toFixed(1)+'% LIVE' : liveSensorSeen ? z.sensorIndex.toFixed(1)+'% STALE' : 'NO LIVE DATA')
+        : 'DEMO';
+    }else{
+      o.val.textContent=z.m.toFixed(1)+'%';
+    }
     const st=riskAt(z.m,z.lo)/100;
     o.plants.style.setProperty('--leafc',mix('#4F9B3A','#B7A14B',st));
     o.leaves.forEach(l=>l.style.transform=`rotate(${(+l.dataset.base)+(+l.dataset.dir)*st*(l.classList.contains('blade')?38:60)}deg)`);
@@ -707,30 +765,23 @@ function sendPackets(){
   });
 }
 
-/* ---------- AquaSentinel FastAPI bridge ----------
-   The field UI remains the same. The browser sends its current simulated sensor
-   values to the real FastAPI backend and uses the backend recommendation/risk
-   in the decision panel and valve animation. Local physics still animates the
-   demo between backend syncs.
-   LOCAL DEMO ONLY: shared API key is intentionally in browser code.
+/* ---------- AquaSentinel FastAPI read-only dashboard bridge ----------
+   The ESP32 is the only source that POSTs Plot A telemetry.
+   The browser only GETs /api/dashboard and never fabricates device readings.
+   LOCAL DEVELOPMENT ONLY: the API key below must not be exposed in a public
+   deployment. Replace this with a server-side read-only proxy before hosting.
 -------------------------------------------------------------------------- */
-const API_BASE = window.AQUA_API_BASE || (location.port === '8000' ? location.origin : 'http://127.0.0.1:8000');
+const API_BASE = window.AQUA_API_BASE || location.origin;
 const API_KEY = window.AQUA_API_KEY || 'dev-key-change-me';
-let backendReady = false, backendBusy = false, backendLastSync = 0;
-
 async function api(path, options={}){
-  const headers = Object.assign({'Content-Type':'application/json','X-API-Key':API_KEY}, options.headers||{});
+  const headers = Object.assign(
+    {'Content-Type':'application/json','X-API-Key':API_KEY},
+    options.headers||{}
+  );
   const r = await fetch(API_BASE + path, Object.assign({}, options, {headers}));
   if(!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
 }
-
-const BACKEND_ZONES = [
-  {id:'A',name:'Plot A',crop:'tomato',stage:'mid',area_m2:80,lat:19.17,lon:73.24,device_id:'esp32-a',pump_flow_lpm:20,auto_mode:false},
-  {id:'B',name:'Plot B',crop:'maize',stage:'development',area_m2:60,lat:19.18,lon:73.25,device_id:'esp32-b',pump_flow_lpm:20,auto_mode:false},
-  {id:'C',name:'Plot C',crop:'cotton',stage:'initial',area_m2:50,lat:19.16,lon:73.23,device_id:'esp32-c',pump_flow_lpm:20,auto_mode:false},
-  {id:'D',name:'Plot D',crop:'wheat',stage:'mid',area_m2:70,lat:19.17,lon:73.26,device_id:'esp32-d',pump_flow_lpm:20,auto_mode:false}
-];
 
 function backendFactorMap(rec){
   const source = Array.isArray(rec?.factors) ? rec.factors : [];
@@ -739,87 +790,164 @@ function backendFactorMap(rec){
     .map((f,i)=>({
       k: f.k || 'f'+i,
       label: String(f.factor || f.label || 'Model factor'),
-      v: Number(f.impact || f.v || 0) * (f.impact !== undefined ? 100 : 1)
+      v: Number(f.impact ?? f.v ?? 0) * (f.impact !== undefined ? 100 : 1)
     }));
 }
+
 function backendAnalysis(rec,z){
   if(!rec) return null;
-  const risk=Number(rec.stress_risk||0)*100;
-  const needMm=Number(rec.net_need_mm||rec.gross_need_mm||0);
+  const risk=clamp(Number(rec.stress_risk||0)*100,0,100);
+  const needMm=Number(rec.net_need_mm ?? rec.gross_need_mm ?? 0);
   const planL=Number(rec.volume_l||0);
-  const p=Number(rec.soil_moisture ?? z.m);
-  const rainHelps=(rec.reasons||[]).some(x=>/rain/i.test(x));
+  // z.m is the mapped internal field-model value; z.sensorIndex remains the
+  // actual 0–100 HW-103 relative moisture index.
+  const p=Number(z.m);
+  const rainHelps=(Array.isArray(rec.reasons)?rec.reasons:[]).some(x=>/rain/i.test(String(x)));
   return {
-    dec:rec.action||'WAIT', risk, riskNow:risk,
+    dec:String(rec.action||'WAIT').toUpperCase(), risk, riskNow:risk,
     factors:backendFactorMap(rec), target:Number(z.lo||20)+5,
     needPct:Math.max(0,(Number(z.lo||20)+5)-p), needMm, planMm:needMm,
     planL, pending:0, rainGain:0, l3:0, p,
-    rainHelps, backend:true, backendReasons:rec.reasons||[],
+    rainHelps, backend:true, backendReasons:Array.isArray(rec.reasons)?rec.reasons:[],
     stressRiskWithoutRain:Number(rec.stress_risk_without_rain||rec.stress_risk||0)*100
   };
 }
 
-async function ensureBackendZones(){
-  let existing=await api('/api/zones');
-  const have=new Set(existing.map(z=>z.id));
-  for(const z of BACKEND_ZONES){
-    if(!have.has(z.id)){
-      try{ await api('/api/zones',{method:'POST',body:JSON.stringify(z)}); }
-      catch(e){ console.warn('Zone setup failed for',z.id,e); }
-    }
-  }
-  return api('/api/zones');
+function setBackendStatus(message, ok){
+  const status=$('#backendStatus');
+  status.textContent=message;
+  status.dataset.ok=ok?'1':'0';
 }
 
-async function pushTelemetryAndReadDashboard(){
-  if(backendBusy) return;
+function epochMs(value){
+  if(value===null || value===undefined || value==='') return 0;
+  if(typeof value==='number' || /^\s*-?\d+(?:\.\d+)?\s*$/.test(String(value))){
+    const n=Number(value);
+    if(!Number.isFinite(n)) return 0;
+    return n>1e12 ? n : n*1000; // Backend stores Unix seconds; tolerate milliseconds too.
+  }
+  const parsed=Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function refreshLiveFreshness(now=Date.now()){
+  if(!liveSensorSeen || !liveReadingTimestampMs){
+    liveSensorAgeMs=Infinity;
+    liveSensorFresh=false;
+    return;
+  }
+  liveSensorAgeMs=Math.max(0,now-liveReadingTimestampMs);
+  liveSensorFresh=liveSensorAgeMs<=LIVE_STALE_AFTER_MS;
+}
+
+function liveAgeLabel(){
+  if(!Number.isFinite(liveSensorAgeMs)) return 'age unknown';
+  if(liveSensorAgeMs<10000) return 'just now';
+  if(liveSensorAgeMs<60000) return Math.round(liveSensorAgeMs/1000)+'s ago';
+  const minutes=Math.floor(liveSensorAgeMs/60000);
+  const seconds=Math.floor((liveSensorAgeMs%60000)/1000);
+  return minutes+'m '+seconds+'s ago';
+}
+
+function liveSampleTimeLabel(){
+  return liveReadingTimestampMs ? new Date(liveReadingTimestampMs).toLocaleTimeString() : 'unknown time';
+}
+
+function liveStatusMessage(){
+  refreshLiveFreshness();
+  if(!backendReady) return liveSensorSeen
+    ? '● BACKEND OFFLINE · last sensor sample '+liveAgeLabel()
+    : '● Backend offline · waiting for ESP32';
+  if(!liveSensorSeen) return '● Backend connected · waiting for ESP32 sample';
+  if(!liveReadingTimestampMs) return '● ESP32 STATUS UNKNOWN · sample timestamp unavailable';
+  if(liveSensorFresh) return '● LIVE ESP32 · sample '+liveSampleTimeLabel()+' ('+liveAgeLabel()+')';
+  return '● ESP32 OFFLINE · last sample '+liveAgeLabel();
+}
+
+function liveNoticeText(){
+  refreshLiveFreshness();
+  if(!liveSensorSeen) return 'WAITING FOR ESP32 — The backend is reachable, but no valid Plot A sensor sample has been received. Plots B–D are demo-only. Pump/relay actuation is disabled.';
+  if(!liveReadingTimestampMs) return 'ESP32 STATUS UNKNOWN — A stored Plot A value exists, but its timestamp is unavailable. It is not labelled live and no new irrigation recommendation is shown. Pump/relay actuation is disabled.';
+  if(liveSensorFresh) return 'LIVE HARDWARE MODE — Plot A is using a recent ESP32/HW-103 sample ('+liveAgeLabel()+'). Plots B–D are demo-only. Pump, relay and valve commands are disabled.';
+  return 'ESP32 OFFLINE / STALE DATA — Last Plot A sample was '+liveAgeLabel()+' (at '+liveSampleTimeLabel()+'). The last value is retained for reference only; no new AI irrigation recommendation is shown. Plots B–D are demo-only. Pump, relay and valve commands are disabled.';
+}
+
+function liveSceneNoteHtml(){
+  refreshLiveFreshness();
+  if(!liveSensorSeen) return 'Live Hardware mode is active. Waiting for a valid Plot A reading from the ESP32. Plots B–D remain demo-only; weather is forecast data and tank figures are estimates.';
+  if(!liveReadingTimestampMs) return 'Plot A has a stored sensor value, but its sample timestamp is unavailable. Connection status cannot be verified, so treat the value as unverified. Plots B–D are demo-only.';
+  if(liveSensorFresh) return 'Plot A reports <b>'+liveSensorIndex.toFixed(1)+'%</b> relative soil-moisture index from the ESP32. Latest sample: <b>'+liveAgeLabel()+'</b>. Plots B–D are demo-only. Weather is forecast data; tank level and water-use figures are estimates. Physical pump/valve control is disabled.';
+  return 'Plot A last reported <b>'+liveSensorIndex.toFixed(1)+'%</b> relative soil-moisture index, but the ESP32 has not sent a recent sample. <b>STALE DATA — '+liveAgeLabel()+'</b>. This retained value is for reference only, not a current measurement. Plots B–D are demo-only; physical pump/valve control is disabled.';
+}
+
+function updateLiveStatusUI(){
+  refreshLiveFreshness();
+  setBackendStatus(liveStatusMessage(),backendReady && liveSensorFresh);
+  const notice=$('#modeNotice');
+  if(notice && liveMode) notice.textContent=liveNoticeText();
+  if(liveMode) buildTabs();
+}
+
+async function syncLiveDashboard(){
+  if(!liveMode || backendBusy) return;
   backendBusy=true;
-  let syncSucceeded=false;
+
   try{
-    await ensureBackendZones();
-    const h=sim.t/60;
-    for(const z of zones){
-      const bz=BACKEND_ZONES.find(x=>x.id===z.id);
-      if(!bz) continue;
-      await api('/api/telemetry',{method:'POST',body:JSON.stringify({
-        device_id:bz.device_id,
-        soil_moisture:Number(clamp(z.m,0,100).toFixed(1)),
-        air_temp:Number(tempAt(h).toFixed(1)),
-        humidity:Number(clamp(env.hum,0,100)),
-        tank_pct:Number(clamp(env.tank/3200*100,0,100).toFixed(1)),
-        flow_lpm:z.pump ? Number(bz.pump_flow_lpm) : 0,
-        pump_on:Boolean(z.pump)
-      })});
-    }
+    // GET only: the ESP32 itself POSTs readings to /api/telemetry.
     const dash=await api('/api/dashboard');
+    backendReady=true;
+    liveLastSync=Date.now();
     const dashboardZones=Array.isArray(dash.zones) ? dash.zones : [];
     const byId=new Map(dashboardZones
       .filter(item=>item && item.zone && item.zone.id)
-      .map(item=>[item.zone.id,item]));
-    zones.forEach(z=>{
-      const item=byId.get(z.id);
-      if(!item) return;
-      if(item.reading && Number.isFinite(Number(item.reading.soil_moisture))) {
-        z.m=Number(item.reading.soil_moisture);
+      .map(item=>[String(item.zone.id),item]));
+
+    const item=byId.get(LIVE_ZONE_ID);
+    const z=zones.find(zone=>zone.id===LIVE_ZONE_ID);
+
+    if(item && z){
+      const reading=item.reading || null;
+      const raw=reading ? reading.soil_moisture : null;
+      if(raw !== null && raw !== undefined && Number.isFinite(Number(raw)) &&
+         Number(raw) >= 0 && Number(raw) <= 100){
+        liveSensorIndex=clamp(Number(raw),0,100);
+        liveSensorSeen=true;
+
+        // Freshness is based on the stored sample timestamp, never on this GET poll time.
+        const serverNow=epochMs(dash.generated_at) || Date.now();
+        const sampleTs=epochMs(reading.ts) || epochMs(reading.time);
+        const ageMin=(reading.age_min===null || reading.age_min===undefined || reading.age_min==='') ? NaN : Number(reading.age_min);
+        liveReadingTimestampMs=sampleTs || (Number.isFinite(ageMin) ? serverNow-Math.max(0,ageMin)*60000 : 0);
+        refreshLiveFreshness(Date.now());
+
+        z.sensorIndex=liveSensorIndex;
+        z.m=sensorIndexToModel(liveSensorIndex);
+
+        // Add one point per newly ingested ESP32 sample, not one point per browser poll.
+        if(liveSensorFresh && liveReadingTimestampMs && liveReadingTimestampMs>liveLastHistoryReadingMs){
+          z.hist.push({t:liveReadingTimestampMs/60000,m:z.m});
+          while(z.hist.length>300) z.hist.shift();
+          liveLastHistoryAt=Date.now();
+          liveLastHistoryReadingMs=liveReadingTimestampMs;
+        }
       }
-      if(item.recommendation) z.backendAn=backendAnalysis(item.recommendation,z);
-    });
-    backendReady=true;
-    backendLastSync=Date.now();
-    const status=$('#backendStatus');
-    status.textContent='● Backend connected'; status.dataset.ok='1';
-    syncSucceeded=true;
+
+      // Never keep a recommendation active when the latest device sample is stale.
+      z.backendAn=(liveSensorFresh && item.recommendation)
+        ? backendAnalysis(item.recommendation,z)
+        : null;
+    }else{
+      const zMissing=zones.find(zone=>zone.id===LIVE_ZONE_ID);
+      if(zMissing) zMissing.backendAn=null;
+      refreshLiveFreshness();
+    }
   }catch(e){
-    console.warn('AquaSentinel backend connection failed:',e);
-    const status=$('#backendStatus');
-    status.textContent='● Backend offline'; status.dataset.ok='0';
+    console.warn('AquaSentinel live dashboard sync failed:',e);
+    backendReady=false;
+    refreshLiveFreshness();
   }finally{
     backendBusy=false;
-  }
-
-  // Keep UI rendering errors separate from API failures. A rendering issue
-  // must never falsely label a healthy FastAPI connection as offline.
-  if(syncSucceeded || !backendReady){
+    updateLiveStatusUI();
     try{
       analyseAll();
       render();
@@ -833,12 +961,26 @@ async function pushTelemetryAndReadDashboard(){
 const tabs=$('#tabs');
 function buildTabs(){
   tabs.innerHTML='';
-  DEFS.forEach((d,i)=>{const b=document.createElement('button');b.type='button';b.textContent=d.name;b.dataset.i=i;b.setAttribute('aria-pressed',i===sel);b.addEventListener('click',()=>select(i));tabs.appendChild(b)});
+  DEFS.forEach((d,i)=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.textContent=liveMode ? (i===0 ? d.name+' · '+(liveSensorFresh?'LIVE':liveSensorSeen?'OFFLINE':'WAITING') : d.name+' · DEMO') : d.name;
+    b.dataset.i=i;
+    b.setAttribute('aria-pressed',i===sel);
+    b.addEventListener('click',()=>select(i));
+    tabs.appendChild(b);
+  });
 }
 function select(i){
   sel=i; lastDec=null;
   [...tabs.children].forEach((b,k)=>b.setAttribute('aria-pressed',k===i));
-  const z=zones[i]; $('#fProbe').value=z.m; $('#lProbe').textContent=`Soil probe reading, ${z.name}`;
+  const z=zones[i];
+  $('#fProbe').value=z.m;
+  const hardwarePlot=liveMode && z.id===LIVE_ZONE_ID;
+  $('#lProbe').textContent=hardwarePlot
+    ? 'Live soil sensor index, Plot A'
+    : `Demo soil probe reading, ${z.name}`;
+  $('#fProbe').disabled=hardwarePlot;
   paintScene(); paintPanels(true);
 }
 let lastDec=null;
@@ -870,19 +1012,50 @@ const fmtSigned=v=>(v>=0?'+':'−')+Math.abs(Math.round(v));
 
 function paintPanels(force){
   const z=zones[sel], a=z?.an; if(!z || !a) return;
+  const hardwarePlot=liveMode && z.id===LIVE_ZONE_ID;
   const factors = Array.isArray(a.factors)
     ? a.factors.filter(f => f && typeof f === 'object')
     : [];
   $('#dzTitle').textContent=`${z.name}, ${z.crop}`;
-  $('#dzSub').textContent=`${z.stage}, ${z.area} m²`;
+  $('#dzSub').textContent=`${z.stage}, ${z.area} m²${hardwarePlot?' · ESP32 '+(liveSensorFresh?'LIVE':liveSensorSeen?'OFFLINE':'WAITING'):liveMode?' · DEMO':''}`;
   const st=$('#stamp');
+
+  if(hardwarePlot && !liveSensorFresh){
+    const hasOld=liveSensorSeen && liveReadingTimestampMs>0;
+    st.textContent=hasOld?'OFFLINE':'WAIT'; st.dataset.d=hasOld?'OFFLINE':'WAIT';
+    $('#action').textContent=hasOld
+      ? 'ESP32 is offline. The last sensor value is retained for reference only.'
+      : 'Waiting for the first valid ESP32 soil reading.';
+    $('#reason').textContent=hasOld
+      ? 'Last sample: '+liveAgeLabel()+' (at '+liveSampleTimeLabel()+'). No new irrigation recommendation is being shown because the device has not transmitted within '+Math.round(LIVE_STALE_AFTER_MS/1000)+' seconds.'
+      : 'The backend is reachable, but no valid timestamped Plot A sensor sample has been received. Keep the ESP32 connected and check its Serial Monitor.';
+    $('#gFill').style.width='0%';
+    $('#gNum').textContent=hasOld?'Stale reading — risk unavailable':'No sensor reading';
+    $('#why').innerHTML='';
+    $('#runNow').disabled=true;
+    $('#runHint').textContent='Pump/relay actuation is disabled; do not act on stale sensor data.';
+    $('#oProbe').textContent=liveSensorSeen ? liveSensorIndex.toFixed(1)+'% · STALE' : 'No reading';
+    $('#fProbe').disabled=true;
+    $('#cmpTitle').textContent='Forecast comparison paused — waiting for fresh Plot A data';
+    document.querySelectorAll('#opts .opt').forEach(card=>{
+      const rk=card.querySelector('.rk'), sm=card.querySelector('.sm'), wl=card.querySelector('.wl'), note=card.querySelector('.n');
+      if(rk) rk.textContent='—'; if(sm) sm.textContent='—'; if(wl) wl.textContent='—';
+      if(note) note.textContent='No comparison is available until the ESP32 sends a fresh reading.';
+      card.classList.remove('rec');
+    });
+    return;
+  }
   if(lastDec!==a.dec){
     st.textContent=a.dec; st.dataset.d=a.dec;
     if(!reduce){st.classList.remove('pop');void st.offsetWidth;st.classList.add('pop')}
     lastDec=a.dec;
   }
   let act;
-  if(z.pump) act=`Valve open, ${(z.pump.rem*z.area).toFixed(0)} L still to go.`;
+  if(hardwarePlot){
+    act=a.dec==='WAIT'
+      ? 'No irrigation recommended now. Physical pump control is not connected.'
+      : `AI recommendation: plan ${Lf(a.planL)} L (${Number(a.planMm||0).toFixed(1)} mm). Pump control is disabled.`;
+  }else if(z.pump) act=`Valve open, ${(z.pump.rem*z.area).toFixed(0)} L still to go.`;
   else if(a.dec==='WAIT') act='No water needed now.';
   else act=`Apply ${Lf(a.planL)} L (${a.planMm.toFixed(1)} mm).`;
   $('#action').textContent=act;
@@ -892,7 +1065,9 @@ function paintPanels(force){
     .slice(0,2)
     .map(f=>String(f.label || f.factor || 'model factor').toLowerCase());
   let why;
-  if(a.dec==='WAIT') why=z.pump?'Water is on its way and the forecast now shows no stress.':a.rainHelps?'Rain is likely to cover the gap, so the valve stays shut and the water stays in the tank.':'The soil holds enough water for the next 12 hours.';
+  if(hardwarePlot && a.backend && Array.isArray(a.backendReasons) && a.backendReasons.length){
+    why=a.backendReasons.join(' ');
+  }else if(a.dec==='WAIT') why=z.pump?'Water is on its way and the forecast now shows no stress.':a.rainHelps?'Rain is likely to cover the gap, so the valve stays shut and the water stays in the tank.':'The soil holds enough water for the next 12 hours.';
   else if(a.dec==='REDUCE') why=`Some stress is coming, but not enough for a full refill. Main drivers: ${top.join(' and ')||'soil dryness'}.`;
   else why=`Stress is likely within 12 hours if nothing changes. Main drivers: ${top.join(' and ')||'soil dryness'}.`;
   $('#reason').textContent=why;
@@ -920,17 +1095,24 @@ function paintPanels(force){
   // Rebuild the sparkline a few times per second, not on every animation frame.
   const sp=$('#spark'); const pts=z.hist; const sparkNow=performance.now();
   if(pts.length>1 && (force || sparkNow-lastSparkRenderAt>=160)){
-    const t0=sim.t-1440, X=t=>(t-t0)/1440*320, Y=m=>76-((clamp(m,8,44)-8)/36)*72-2;
+    const chartNow=hardwarePlot ? Date.now()/60000 : sim.t;
+    const chartWindow=hardwarePlot ? 10 : 1440;
+    const t0=chartNow-chartWindow, X=t=>(t-t0)/chartWindow*320, Y=m=>76-((clamp(m,8,44)-8)/36)*72-2;
     const d=pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+' '+Y(p.m).toFixed(1)).join('');
     sp.innerHTML=`<line x1="0" x2="320" y1="${Y(z.lo).toFixed(1)}" y2="${Y(z.lo).toFixed(1)}" stroke="var(--ink2)" stroke-width="1.2" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/><path d="${d}" fill="none" stroke="var(--wait)" stroke-width="2.4" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
     lastSparkRenderAt=sparkNow;
   }
   const al=allocate();
   const btn=$('#runNow'); const can=!z.pump&&a.dec!=='WAIT'&&al.out[z.id]>=20;
-  btn.disabled=!can;
-  $('#runHint').textContent=z.pump?'Valve is already open.':a.dec==='WAIT'?'Nothing to do while the call is WAIT.':can?'':'Budget or tank has no water left for this plot.';
+  btn.disabled=liveMode || !can;
+  $('#runHint').textContent=liveMode
+    ? 'Pump/relay is not connected; this is a recommendation only.'
+    : z.pump?'Valve is already open.':a.dec==='WAIT'?'Nothing to do while the call is WAIT.':can?'':'Budget or tank has no water left for this plot.';
   if(document.activeElement!==$('#fProbe')) $('#fProbe').value=z.m;
-  $('#oProbe').textContent=z.m.toFixed(1)+'%';
+  $('#fProbe').disabled=hardwarePlot;
+  $('#oProbe').textContent=hardwarePlot
+    ? z.sensorIndex.toFixed(1)+'% relative sensor index'
+    : z.m.toFixed(1)+'%';
   // compare
   $('#cmpTitle').textContent=`Four ways to handle ${z.name} in the next 12 hours`;
   const base=z.m-a.l3+a.rainGain+a.pending;
@@ -960,9 +1142,14 @@ function paintPanels(force){
   });
 }
 function paintGlobal(){
-  $('#clock').textContent=clockStr(sim.t);
   const h=(sim.t/60)%24;
-  $('#sceneNote').innerHTML=`It is <b>${tempAt(h).toFixed(1)} °C</b> with <b>${env.hum}%</b> humidity and a <b>${env.rainProb}%</b> chance of ${env.rainMm} mm of rain. The tank holds <b>${Lf(env.tank)} L</b>, and <b>${Lf(sim.usedToday)} L</b> of today's <b>${Lf(env.budget)} L</b> budget has gone into the ground.`;
+  if(liveMode){
+    $('#clock').textContent='Dashboard · '+new Date().toLocaleTimeString();
+    $('#sceneNote').innerHTML=liveSceneNoteHtml();
+  }else{
+    $('#clock').textContent=clockStr(sim.t);
+    $('#sceneNote').innerHTML=`It is <b>${tempAt(h).toFixed(1)} °C</b> with <b>${env.hum}%</b> humidity and a <b>${env.rainProb}%</b> chance of ${env.rainMm} mm of rain. The tank holds <b>${Lf(env.tank)} L</b>, and <b>${Lf(sim.usedToday)} L</b> of today's <b>${Lf(env.budget)} L</b> budget has gone into the ground.`;
+  }
   const al=allocate();
   zones.forEach(z=>{
     const r=budRows[z.id], need=z.pump?z.pump.rem*z.area:z.an.planL, got=al.out[z.id];
@@ -970,21 +1157,32 @@ function paintGlobal(){
     r.need.style.width=clamp(need/cap*100,0,100)+'%'; r.got.style.width=clamp(got/cap*100,0,100)+'%';
     r.at.textContent=z.pump?`Watering, ${Lf(need)} L to go`:z.an.dec==='WAIT'?'Not needed':got>=need-1?`${z.an.dec}, ${Lf(got)} L`:got>0.5?`Partly, ${Lf(got)} of ${Lf(need)} L`:`Held back, needs ${Lf(need)} L`;
   });
-  $('#remain').innerHTML=`<b>${Lf(al.avail)} L</b> can still be handed out today${env.tank<env.budget-sim.usedToday?', limited by the tank':''}.`;
+  if(liveMode){
+    $('#remain').textContent='Demo-only allocation. No pump or flow sensor is connected, so actual water use is not measured.';
+    $('#tUsed').textContent='—';
+    $('#tFixed').textContent='Demo only';
+    $('#tStress').textContent='—';
+  }else{
+    $('#remain').innerHTML=`<b>${Lf(al.avail)} L</b> can still be handed out today${env.tank<env.budget-sim.usedToday?', limited by the tank':''}.`;
+    $('#tUsed').textContent=Lf(sim.usedTotal)+' L';
+    $('#tFixed').textContent=Lf(sim.fixedTotal)+' L';
+    $('#tStress').textContent=sim.stressPH.toFixed(1);
+  }
   $('#oBud').textContent=Lf(env.budget)+' L';
-  $('#tUsed').textContent=Lf(sim.usedTotal)+' L';
-  $('#tFixed').textContent=Lf(sim.fixedTotal)+' L';
-  $('#tStress').textContent=sim.stressPH.toFixed(1);
   // pipeline live text
   const P=id=>$('#'+id);
   if(P('pp1')){
-    P('pp1').textContent=zones.map(z=>z.m.toFixed(0)).join(', ')+' %';
-    P('pp2').textContent='Sent at '+clockStr(sim.t).split(', ')[1];
-    P('pp3').textContent='Risk '+zones.map(z=>Math.round(z.an.risk)).join(', ');
-    P('pp4').textContent=`${Lf(env.tank)} L, ${env.rainProb}% rain`;
+    P('pp1').textContent=liveMode
+      ? (!liveSensorSeen ? 'No Plot A sample; B–D demo' : liveSensorFresh ? liveSensorIndex.toFixed(1)+'% live; B–D demo' : liveSensorIndex.toFixed(1)+'% stale; B–D demo')
+      : zones.map(z=>z.m.toFixed(0)).join(', ')+' %';
+    P('pp2').textContent=liveMode
+      ? (liveReadingTimestampMs ? 'ESP32 sample '+liveSampleTimeLabel()+' ('+liveAgeLabel()+')' : 'Waiting for timestamped ESP32 sample')
+      : 'Sent at '+clockStr(sim.t).split(', ')[1];
+    P('pp3').textContent=(liveMode && !liveSensorFresh) ? 'Plot A risk paused · waiting for fresh sample' : 'Risk '+zones.map(z=>Math.round(z.an.risk)).join(', ');
+    P('pp4').textContent=`${Lf(env.tank)} L (estimate), ${env.rainProb}% rain`;
     P('pp5').textContent=zones.map(z=>z.an.dec[0]+z.an.dec.slice(1).toLowerCase()).join(', ');
     const open=zones.filter(z=>z.pump).length;
-    P('pp6').textContent=open?`${open} valve${open>1?'s':''} open`:'All valves shut';
+    P('pp6').textContent=liveMode?'Hardware pump control disabled':open?`${open} valve${open>1?'s':''} open`:'All valves shut';
   }
 }
 function render(){ paintScene(); paintPanels(false); paintGlobal(); }
@@ -1029,17 +1227,89 @@ function syncInputs(){
   set('#fRp','#oRp',env.rainProb,v=>v+'%'); set('#fRm','#oRm',env.rainMm,v=>v+' mm');
   set('#fTank','#oTank',Math.round(env.tank),v=>Lf(v)+' L'); set('#fBud','#oBud',env.budget,v=>Lf(v)+' L');
 }
+function applyModeUI(){
+  $('#modeSimBtn').setAttribute('aria-pressed',String(!liveMode));
+  $('#modeLiveBtn').setAttribute('aria-pressed',String(liveMode));
+  $('#modeNotice').dataset.mode=liveMode?'live':'simulation';
+
+  if(liveMode){
+    $('#modeNotice').textContent=liveNoticeText();
+    $('#heroCopy').textContent='Plot A receives its soil-moisture index from the physical ESP32. The backend supplies its recommendation. Plots B–D remain demo plots until additional devices are connected.';
+    $('#scenarioCopy').textContent='These scenario controls affect demo plots only. Plot A uses the latest reading stored by the ESP32 and cannot be manually overridden here.';
+    $('#footerCopy').textContent='Built by Team Nirman for the PCCOE International Grand Challenge 2026, theme AI for Climate Change. In Live Hardware mode, Plot A uses the ESP32 soil probe and backend recommendation; Plots B–D remain simulated. Weather is forecast data. Tank and water-use values are estimates. Pump/valve actuation is not connected.';
+    $('#playBtn').disabled=true;
+    document.querySelectorAll('[data-speed]').forEach(b=>b.disabled=true);
+    $('#auto').checked=false;
+    $('#auto').disabled=true;
+    $('#resetBtn').disabled=true;
+    $('#runNow').disabled=true;
+  }else{
+    $('#modeNotice').textContent='SIMULATION MODE — All plots, soil readings, weather scenarios and valve animations are generated locally for demonstration. No device telemetry is sent to the backend.';
+    $('#heroCopy').textContent='Explore the four-plot AquaSentinel AI simulation. Change weather and soil scenarios to see how the local decision model responds. No physical sensor data is used in this mode.';
+    $('#scenarioCopy').textContent='Pick a scenario or move the sliders. The local demonstration model forecasts each plot again straight away.';
+    $('#footerCopy').textContent='Built by Team Nirman for the PCCOE International Grand Challenge 2026, theme AI for Climate Change. Simulation mode runs locally in the browser and does not send fabricated sensor data to the backend. Switch to Live Hardware to see Plot A readings from the ESP32.';
+    $('#playBtn').disabled=false;
+    document.querySelectorAll('[data-speed]').forEach(b=>b.disabled=false);
+    $('#auto').disabled=false;
+    $('#auto').checked=sim.auto;
+    $('#resetBtn').disabled=false;
+  }
+
+  buildTabs();
+  select(sel);
+  if(liveMode){
+    updateLiveStatusUI();
+  }else{
+    setBackendStatus('● Simulation mode · local only',true);
+  }
+}
+
+function setMode(next){
+  const nextLive=next==='live';
+  if(liveMode===nextLive){
+    if(nextLive) syncLiveDashboard();
+    return;
+  }
+  liveMode=nextLive;
+  if(liveMode){
+    sim.paused=true;
+    sim.auto=false;
+  }else{
+    sim.paused=false;
+    sim.auto=true;
+  }
+  applyModeUI();
+  analyseAll();
+  render();
+  if(liveMode) syncLiveDashboard();
+}
+
 function bindInputs(){
-  const bind=(id,key,resched)=>$(id).addEventListener('input',e=>{env[key]=+e.target.value;if(resched)scheduleRain();syncInputs();analyseAll();render();clearTimeout(window.__aquaSyncTimer);window.__aquaSyncTimer=setTimeout(pushTelemetryAndReadDashboard,350)});
+  $('#modeSimBtn').addEventListener('click',()=>setMode('simulation'));
+  $('#modeLiveBtn').addEventListener('click',()=>setMode('live'));
+  const bind=(id,key,resched)=>$(id).addEventListener('input',e=>{
+    env[key]=+e.target.value;
+    if(resched)scheduleRain();
+    syncInputs(); analyseAll(); render();
+  });
   bind('#fPeak','peak'); bind('#fHum','hum'); bind('#fRp','rainProb',true); bind('#fRm','rainMm',true); bind('#fTank','tank'); bind('#fBud','budget');
-  $('#fProbe').addEventListener('input',e=>{zones[sel].m=+e.target.value;analyseAll();render();clearTimeout(window.__aquaSyncTimer);window.__aquaSyncTimer=setTimeout(pushTelemetryAndReadDashboard,350)});
+  $('#fProbe').addEventListener('input',e=>{
+    if(liveMode && zones[sel].id===LIVE_ZONE_ID) return;
+    zones[sel].m=+e.target.value;
+    analyseAll(); render();
+  });
   const P={heat:{peak:41,hum:24,rainProb:0,rainMm:0},rain:{peak:29,hum:78,rainProb:85,rainMm:14},clear:{peak:31,hum:50,rainProb:5,rainMm:0}};
   document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>{Object.assign(env,P[b.dataset.preset]);scheduleRain();syncInputs();analyseAll();render()}));
-  $('#runNow').addEventListener('click',()=>{const z=zones[sel],al=allocate();startPump(z,al.out[z.id]/z.area);analyseAll();render()});
+  $('#runNow').addEventListener('click',()=>{
+    if(liveMode) return; // No physical relay/pump command is implemented.
+    const z=zones[sel],al=allocate();
+    startPump(z,al.out[z.id]/z.area); analyseAll(); render();
+  });
   $('#playBtn').addEventListener('click',()=>{sim.paused=!sim.paused;$('#playBtn').textContent=sim.paused?'Play':'Pause'});
   document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',()=>{sim.speed=+b.dataset.speed;document.querySelectorAll('[data-speed]').forEach(x=>x.setAttribute('aria-pressed',x===b))}));
   $('#auto').addEventListener('change',e=>{sim.auto=e.target.checked});
   $('#resetBtn').addEventListener('click',()=>{
+    if(liveMode) return;
     const sp=sim.speed,au=$('#auto').checked;
     freshState(); sim.speed=sp; sim.auto=au; ledgerEl.innerHTML=''; ledgerEmpty.style.display='';
     prevU={sun:0,moon:0}; buildScene(); analyseAll(); syncInputs(); select(sel); scheduleRain();
@@ -1056,10 +1326,13 @@ function bindReveal(){
 }
 
 /* ---------- boot ---------- */
-freshState(); buildScene(); buildTabs(); buildOpts(); buildBudget(); buildPipe(); syncInputs(); bindInputs(); bindReveal();
-analyseAll(); select(sel); scheduleRain(); render();
-pushTelemetryAndReadDashboard();
-setInterval(pushTelemetryAndReadDashboard, 5000);
+freshState();
+sim.paused=liveMode;
+sim.auto=false;
+buildScene(); buildTabs(); buildOpts(); buildBudget(); buildPipe(); syncInputs(); bindInputs(); bindReveal();
+analyseAll(); select(sel); scheduleRain(); applyModeUI(); render();
+if(liveMode) syncLiveDashboard();
+setInterval(()=>{ if(liveMode) syncLiveDashboard(); },5000);
 // Drive the field simulation from requestAnimationFrame instead of a 500 ms
 // interval. The old timer only refreshed twice per second, which made the sun,
 // soil water line, probes and plants visibly jump. This preserves the existing
@@ -1072,7 +1345,7 @@ function animateAquaFrame(now){
   const elapsedMs=Math.min(Math.max(0,now-previousFrameTime),50);
   previousFrameTime=now;
 
-  if(document.hidden){
+  if(document.hidden || liveMode){
     packetElapsedMs=0;
   }else if(!sim.paused){
     const simulatedMinutes=elapsedMs*(12*sim.speed)/1000;
@@ -1095,7 +1368,17 @@ document.addEventListener('visibilitychange',()=>{
   previousFrameTime=0;
   packetElapsedMs=0;
 });
-window.__aqua={get zones(){return zones},get env(){return env},get sim(){return sim}};
+window.__aqua={
+  get zones(){return zones},
+  get env(){return env},
+  get sim(){return sim},
+  get mode(){return liveMode?'live':'simulation'},
+  get liveSensorIndex(){return liveSensorIndex},
+  get liveLastSync(){return liveLastSync},
+  get liveSensorFresh(){refreshLiveFreshness();return liveSensorFresh},
+  get liveSensorAgeMs(){refreshLiveFreshness();return liveSensorAgeMs},
+  get liveReadingTimestampMs(){return liveReadingTimestampMs}
+};
 })();
 </script>
 </body>
